@@ -1,14 +1,23 @@
 'use strict';
 
+const { withPrefix } = require('../config/tablePrefix');
+
 /**
  * Initial schema migration — creates every table for the Admission CRM in
  * dependency order with foreign keys, indexes and soft-delete columns.
+ *
+ * Every table name is run through `withPrefix` so the physical tables are
+ * namespaced (default `telephony_`), matching the runtime models.
  */
 module.exports = {
   async up(queryInterface, Sequelize) {
     const { BIGINT, STRING, TEXT, INTEGER, BOOLEAN, DATE, DATEONLY, JSON, ENUM, DECIMAL, UUID } =
       Sequelize;
     const t = (extra = {}) => ({ type: DATE, allowNull: true, ...extra });
+
+    // Prefix-aware wrappers so the bare table names below stay readable.
+    const createTable = (name, ...rest) => queryInterface.createTable(withPrefix(name), ...rest);
+    const addIndex = (name, ...rest) => queryInterface.addIndex(withPrefix(name), ...rest);
 
     // Standard audit/timestamp columns appended to most tables.
     const audit = () => ({
@@ -20,13 +29,13 @@ module.exports = {
     const fk = (table, opts = {}) => ({
       type: BIGINT.UNSIGNED,
       allowNull: opts.allowNull !== false,
-      references: { model: table, key: 'id' },
+      references: { model: withPrefix(table), key: 'id' },
       onUpdate: 'CASCADE',
       onDelete: opts.onDelete || 'SET NULL',
     });
 
     // ---- roles ----
-    await queryInterface.createTable('roles', {
+    await createTable('roles', {
       id: id(),
       name: { type: STRING(100), allowNull: false },
       slug: { type: STRING(60), allowNull: false, unique: true },
@@ -36,7 +45,7 @@ module.exports = {
     });
 
     // ---- permissions ----
-    await queryInterface.createTable('permissions', {
+    await createTable('permissions', {
       id: id(),
       name: { type: STRING(120), allowNull: false },
       slug: { type: STRING(120), allowNull: false, unique: true },
@@ -46,17 +55,17 @@ module.exports = {
     });
 
     // ---- role_permissions (join) ----
-    await queryInterface.createTable('role_permissions', {
+    await createTable('role_permissions', {
       id: id(),
       role_id: fk('roles', { allowNull: false, onDelete: 'CASCADE' }),
       permission_id: fk('permissions', { allowNull: false, onDelete: 'CASCADE' }),
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updated_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('role_permissions', ['role_id', 'permission_id'], { unique: true });
+    await addIndex('role_permissions', ['role_id', 'permission_id'], { unique: true });
 
     // ---- users ----
-    await queryInterface.createTable('users', {
+    await createTable('users', {
       id: id(),
       uuid: { type: UUID, allowNull: false },
       name: { type: STRING(150), allowNull: false },
@@ -74,12 +83,12 @@ module.exports = {
       created_by: { type: BIGINT.UNSIGNED, allowNull: true },
       ...audit(),
     });
-    await queryInterface.addIndex('users', ['role_id']);
-    await queryInterface.addIndex('users', ['team_leader_id']);
-    await queryInterface.addIndex('users', ['status']);
+    await addIndex('users', ['role_id']);
+    await addIndex('users', ['team_leader_id']);
+    await addIndex('users', ['status']);
 
     // ---- user_permissions ----
-    await queryInterface.createTable('user_permissions', {
+    await createTable('user_permissions', {
       id: id(),
       user_id: fk('users', { allowNull: false, onDelete: 'CASCADE' }),
       permission_id: fk('permissions', { allowNull: false, onDelete: 'CASCADE' }),
@@ -87,10 +96,10 @@ module.exports = {
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updated_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('user_permissions', ['user_id', 'permission_id'], { unique: true });
+    await addIndex('user_permissions', ['user_id', 'permission_id'], { unique: true });
 
     // ---- refresh_tokens ----
-    await queryInterface.createTable('refresh_tokens', {
+    await createTable('refresh_tokens', {
       id: id(),
       user_id: fk('users', { allowNull: false, onDelete: 'CASCADE' }),
       token_hash: { type: STRING(255), allowNull: false },
@@ -103,11 +112,11 @@ module.exports = {
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updated_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('refresh_tokens', ['user_id']);
-    await queryInterface.addIndex('refresh_tokens', ['token_hash']);
+    await addIndex('refresh_tokens', ['user_id']);
+    await addIndex('refresh_tokens', ['token_hash']);
 
     // ---- lead_sources ----
-    await queryInterface.createTable('lead_sources', {
+    await createTable('lead_sources', {
       id: id(),
       name: { type: STRING(100), allowNull: false },
       slug: { type: STRING(80), allowNull: false, unique: true },
@@ -117,7 +126,7 @@ module.exports = {
     });
 
     // ---- lead_statuses ----
-    await queryInterface.createTable('lead_statuses', {
+    await createTable('lead_statuses', {
       id: id(),
       name: { type: STRING(80), allowNull: false },
       slug: { type: STRING(80), allowNull: false, unique: true },
@@ -130,7 +139,7 @@ module.exports = {
     });
 
     // ---- students ----
-    await queryInterface.createTable('students', {
+    await createTable('students', {
       id: id(),
       uuid: { type: UUID, allowNull: false },
       first_name: { type: STRING(100), allowNull: false },
@@ -148,12 +157,12 @@ module.exports = {
       meta: { type: JSON, allowNull: true },
       ...audit(),
     });
-    await queryInterface.addIndex('students', ['phone']);
-    await queryInterface.addIndex('students', ['email']);
-    await queryInterface.addIndex('students', ['city']);
+    await addIndex('students', ['phone']);
+    await addIndex('students', ['email']);
+    await addIndex('students', ['city']);
 
     // ---- student_documents ----
-    await queryInterface.createTable('student_documents', {
+    await createTable('student_documents', {
       id: id(),
       student_id: fk('students', { allowNull: false, onDelete: 'CASCADE' }),
       type: { type: STRING(60), allowNull: false },
@@ -165,10 +174,10 @@ module.exports = {
       uploaded_by: fk('users'),
       ...audit(),
     });
-    await queryInterface.addIndex('student_documents', ['student_id']);
+    await addIndex('student_documents', ['student_id']);
 
     // ---- leads ----
-    await queryInterface.createTable('leads', {
+    await createTable('leads', {
       id: id(),
       uuid: { type: UUID, allowNull: false },
       reference_no: { type: STRING(40), allowNull: true, unique: true },
@@ -193,16 +202,16 @@ module.exports = {
       created_by: { type: BIGINT.UNSIGNED, allowNull: true },
       ...audit(),
     });
-    await queryInterface.addIndex('leads', ['assigned_to']);
-    await queryInterface.addIndex('leads', ['status_id']);
-    await queryInterface.addIndex('leads', ['source_id']);
-    await queryInterface.addIndex('leads', ['pipeline_stage']);
-    await queryInterface.addIndex('leads', ['next_followup_at']);
-    await queryInterface.addIndex('leads', ['assigned_to', 'pipeline_stage']);
-    await queryInterface.addIndex('leads', ['course', 'city']);
+    await addIndex('leads', ['assigned_to']);
+    await addIndex('leads', ['status_id']);
+    await addIndex('leads', ['source_id']);
+    await addIndex('leads', ['pipeline_stage']);
+    await addIndex('leads', ['next_followup_at']);
+    await addIndex('leads', ['assigned_to', 'pipeline_stage']);
+    await addIndex('leads', ['course', 'city']);
 
     // ---- lead_assignments ----
-    await queryInterface.createTable('lead_assignments', {
+    await createTable('lead_assignments', {
       id: id(),
       lead_id: fk('leads', { allowNull: false, onDelete: 'CASCADE' }),
       assigned_to: fk('users', { allowNull: false }),
@@ -212,11 +221,11 @@ module.exports = {
       is_active: { type: BOOLEAN, defaultValue: true },
       ...audit(),
     });
-    await queryInterface.addIndex('lead_assignments', ['lead_id']);
-    await queryInterface.addIndex('lead_assignments', ['assigned_to']);
+    await addIndex('lead_assignments', ['lead_id']);
+    await addIndex('lead_assignments', ['assigned_to']);
 
     // ---- followups ----
-    await queryInterface.createTable('followups', {
+    await createTable('followups', {
       id: id(),
       lead_id: fk('leads', { allowNull: false, onDelete: 'CASCADE' }),
       user_id: fk('users', { allowNull: false }),
@@ -230,13 +239,13 @@ module.exports = {
       reminder_sent: { type: BOOLEAN, defaultValue: false },
       ...audit(),
     });
-    await queryInterface.addIndex('followups', ['lead_id']);
-    await queryInterface.addIndex('followups', ['user_id']);
-    await queryInterface.addIndex('followups', ['status']);
-    await queryInterface.addIndex('followups', ['scheduled_at']);
+    await addIndex('followups', ['lead_id']);
+    await addIndex('followups', ['user_id']);
+    await addIndex('followups', ['status']);
+    await addIndex('followups', ['scheduled_at']);
 
     // ---- call_logs ----
-    await queryInterface.createTable('call_logs', {
+    await createTable('call_logs', {
       id: id(),
       uuid: { type: UUID, allowNull: false },
       provider: { type: STRING(40), allowNull: true },
@@ -256,13 +265,13 @@ module.exports = {
       meta: { type: JSON, allowNull: true },
       ...audit(),
     });
-    await queryInterface.addIndex('call_logs', ['lead_id']);
-    await queryInterface.addIndex('call_logs', ['agent_id']);
-    await queryInterface.addIndex('call_logs', ['status']);
-    await queryInterface.addIndex('call_logs', ['agent_id', 'started_at']);
+    await addIndex('call_logs', ['lead_id']);
+    await addIndex('call_logs', ['agent_id']);
+    await addIndex('call_logs', ['status']);
+    await addIndex('call_logs', ['agent_id', 'started_at']);
 
     // ---- call_recordings ----
-    await queryInterface.createTable('call_recordings', {
+    await createTable('call_recordings', {
       id: id(),
       call_id: fk('call_logs', { allowNull: false, onDelete: 'CASCADE' }),
       source_url: { type: STRING(512), allowNull: true },
@@ -275,11 +284,11 @@ module.exports = {
       archived_at: t(),
       ...audit(),
     });
-    await queryInterface.addIndex('call_recordings', ['call_id']);
-    await queryInterface.addIndex('call_recordings', ['status']);
+    await addIndex('call_recordings', ['call_id']);
+    await addIndex('call_recordings', ['status']);
 
     // ---- call_transcripts ----
-    await queryInterface.createTable('call_transcripts', {
+    await createTable('call_transcripts', {
       id: id(),
       call_id: fk('call_logs', { allowNull: false, onDelete: 'CASCADE' }),
       language: { type: STRING(20), allowNull: true },
@@ -293,11 +302,11 @@ module.exports = {
       error: { type: STRING(512), allowNull: true },
       ...audit(),
     });
-    await queryInterface.addIndex('call_transcripts', ['call_id']);
-    await queryInterface.addIndex('call_transcripts', ['status']);
+    await addIndex('call_transcripts', ['call_id']);
+    await addIndex('call_transcripts', ['status']);
 
     // ---- call_analysis ----
-    await queryInterface.createTable('call_analysis', {
+    await createTable('call_analysis', {
       id: id(),
       call_id: fk('call_logs', { allowNull: false, onDelete: 'CASCADE' }),
       interest_score: { type: DECIMAL(5, 2), allowNull: true },
@@ -320,12 +329,12 @@ module.exports = {
       error: { type: STRING(512), allowNull: true },
       ...audit(),
     });
-    await queryInterface.addIndex('call_analysis', ['call_id']);
-    await queryInterface.addIndex('call_analysis', ['sentiment']);
-    await queryInterface.addIndex('call_analysis', ['status']);
+    await addIndex('call_analysis', ['call_id']);
+    await addIndex('call_analysis', ['sentiment']);
+    await addIndex('call_analysis', ['status']);
 
     // ---- notifications ----
-    await queryInterface.createTable('notifications', {
+    await createTable('notifications', {
       id: id(),
       user_id: fk('users', { allowNull: false, onDelete: 'CASCADE' }),
       type: { type: STRING(60), allowNull: false },
@@ -336,11 +345,11 @@ module.exports = {
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updated_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('notifications', ['user_id', 'read_at']);
-    await queryInterface.addIndex('notifications', ['type']);
+    await addIndex('notifications', ['user_id', 'read_at']);
+    await addIndex('notifications', ['type']);
 
     // ---- activity_logs ----
-    await queryInterface.createTable('activity_logs', {
+    await createTable('activity_logs', {
       id: id(),
       user_id: fk('users'),
       subject_type: { type: STRING(60), allowNull: false },
@@ -351,11 +360,11 @@ module.exports = {
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updated_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('activity_logs', ['subject_type', 'subject_id']);
-    await queryInterface.addIndex('activity_logs', ['user_id']);
+    await addIndex('activity_logs', ['subject_type', 'subject_id']);
+    await addIndex('activity_logs', ['user_id']);
 
     // ---- audit_logs ----
-    await queryInterface.createTable('audit_logs', {
+    await createTable('audit_logs', {
       id: id(),
       user_id: fk('users'),
       action: { type: STRING(120), allowNull: false },
@@ -369,12 +378,12 @@ module.exports = {
       changes: { type: JSON, allowNull: true },
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('audit_logs', ['user_id']);
-    await queryInterface.addIndex('audit_logs', ['action']);
-    await queryInterface.addIndex('audit_logs', ['entity', 'entity_id']);
+    await addIndex('audit_logs', ['user_id']);
+    await addIndex('audit_logs', ['action']);
+    await addIndex('audit_logs', ['entity', 'entity_id']);
 
     // ---- whatsapp_logs ----
-    await queryInterface.createTable('whatsapp_logs', {
+    await createTable('whatsapp_logs', {
       id: id(),
       lead_id: fk('leads', { onDelete: 'SET NULL' }),
       to_number: { type: STRING(20), allowNull: false },
@@ -387,11 +396,11 @@ module.exports = {
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updated_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('whatsapp_logs', ['lead_id']);
-    await queryInterface.addIndex('whatsapp_logs', ['status']);
+    await addIndex('whatsapp_logs', ['lead_id']);
+    await addIndex('whatsapp_logs', ['status']);
 
     // ---- email_logs ----
-    await queryInterface.createTable('email_logs', {
+    await createTable('email_logs', {
       id: id(),
       lead_id: fk('leads', { onDelete: 'SET NULL' }),
       to_email: { type: STRING(190), allowNull: false },
@@ -410,11 +419,11 @@ module.exports = {
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updated_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('email_logs', ['lead_id']);
-    await queryInterface.addIndex('email_logs', ['status']);
+    await addIndex('email_logs', ['lead_id']);
+    await addIndex('email_logs', ['status']);
 
     // ---- applications ----
-    await queryInterface.createTable('applications', {
+    await createTable('applications', {
       id: id(),
       application_no: { type: STRING(40), allowNull: false, unique: true },
       lead_id: fk('leads', { allowNull: false, onDelete: 'CASCADE' }),
@@ -430,12 +439,12 @@ module.exports = {
       meta: { type: JSON, allowNull: true },
       ...audit(),
     });
-    await queryInterface.addIndex('applications', ['lead_id']);
-    await queryInterface.addIndex('applications', ['student_id']);
-    await queryInterface.addIndex('applications', ['status']);
+    await addIndex('applications', ['lead_id']);
+    await addIndex('applications', ['student_id']);
+    await addIndex('applications', ['status']);
 
     // ---- admissions ----
-    await queryInterface.createTable('admissions', {
+    await createTable('admissions', {
       id: id(),
       admission_no: { type: STRING(40), allowNull: false, unique: true },
       application_id: fk('applications', { allowNull: false, onDelete: 'CASCADE' }),
@@ -449,12 +458,12 @@ module.exports = {
       enrolled_at: t(),
       ...audit(),
     });
-    await queryInterface.addIndex('admissions', ['counselor_id']);
-    await queryInterface.addIndex('admissions', ['status']);
-    await queryInterface.addIndex('admissions', ['student_id']);
+    await addIndex('admissions', ['counselor_id']);
+    await addIndex('admissions', ['status']);
+    await addIndex('admissions', ['student_id']);
 
     // ---- settings ----
-    await queryInterface.createTable('settings', {
+    await createTable('settings', {
       id: id(),
       user_id: fk('users', { onDelete: 'CASCADE' }),
       key: { type: STRING(120), allowNull: false },
@@ -462,10 +471,10 @@ module.exports = {
       created_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
       updated_at: { type: DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     });
-    await queryInterface.addIndex('settings', ['user_id', 'key'], { unique: true });
+    await addIndex('settings', ['user_id', 'key'], { unique: true });
 
     // ---- system_configs ----
-    await queryInterface.createTable('system_configs', {
+    await createTable('system_configs', {
       id: id(),
       key: { type: STRING(120), allowNull: false, unique: true },
       value: { type: JSON, allowNull: true },
@@ -487,7 +496,7 @@ module.exports = {
       'refresh_tokens', 'user_permissions', 'users', 'role_permissions', 'permissions', 'roles',
     ];
     for (const table of tables) {
-      await queryInterface.dropTable(table);
+      await queryInterface.dropTable(withPrefix(table));
     }
   },
 };

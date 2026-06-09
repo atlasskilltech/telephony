@@ -68,10 +68,17 @@ Telephony webhook ──▶ CallLog updated ──▶ CallRecording created
 
 ---
 
-## Quick start (local)
+## Quick start (local, no Docker)
+
+Docker is entirely optional — the app runs directly on any host with Node,
+MySQL and Redis installed. Every table is namespaced with the `telephony_`
+prefix (configurable via `DB_TABLE_PREFIX`), so the schema can safely live in a
+shared/existing database.
 
 ### Prerequisites
 - Node.js ≥ 20 (22 recommended), MySQL 8, Redis 7
+  (install these natively — e.g. `apt install mysql-server redis-server`,
+  Homebrew, or managed services; no containers required)
 
 ```bash
 # 1. Install
@@ -94,7 +101,7 @@ npm run worker:dev          # BullMQ worker (AI/email/whatsapp jobs)
 
 **Default login:** `admin@admissioncrm.local` / `Admin@12345`
 
-### With Docker
+### With Docker (optional)
 
 ```bash
 cp .env.example .env
@@ -115,6 +122,9 @@ All configuration is environment-driven (see `.env.example`). Key groups:
   mode** so the full pipeline stays runnable in dev.
 - **Storage:** `STORAGE_DRIVER=local` writes recordings under `./storage`;
   set `s3` + AWS creds for production.
+- **Table prefix:** `DB_TABLE_PREFIX` (default `telephony_`) namespaces every
+  table — migrations, seeders and runtime models all read from it, so they stay
+  in sync. Set it to an empty string to use bare table names.
 
 ---
 

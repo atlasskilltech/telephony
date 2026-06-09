@@ -1,12 +1,13 @@
 'use strict';
 
 const { DataTypes, Model } = require('sequelize');
+const { withPrefix } = require('../config/tablePrefix');
 
 module.exports = (sequelize) => {
   class Permission extends Model {
     static associate(models) {
       Permission.belongsToMany(models.Role, {
-        through: 'role_permissions',
+        through: withPrefix('role_permissions'),
         foreignKey: 'permission_id',
         otherKey: 'role_id',
         as: 'roles',

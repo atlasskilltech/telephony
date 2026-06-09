@@ -4,6 +4,12 @@ MySQL 8 (utf8mb4), Sequelize ORM. All tables use `BIGINT UNSIGNED` PKs,
 `snake_case` columns, audit timestamps (`created_at`, `updated_at`) and — where
 appropriate — soft deletes (`deleted_at`, paranoid mode).
 
+> **Table prefix:** every physical table is namespaced with `DB_TABLE_PREFIX`
+> (default `telephony_`), so e.g. `users` is created as `telephony_users`. The
+> table names in this document are shown unprefixed for readability. The prefix
+> is defined once in `src/config/tablePrefix.js` and applied to models,
+> migrations and seeders alike; set `DB_TABLE_PREFIX=` (empty) to disable it.
+
 ## Entity overview
 
 ```
