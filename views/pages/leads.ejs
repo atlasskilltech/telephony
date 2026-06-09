@@ -13,6 +13,7 @@
         <option value="<%= s %>"><%= s.replace(/_/g,' ') %></option>
       <% }); %>
     </select>
+    <button @click="openImport()" class="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">Import CSV</button>
     <button @click="showCreate = true" class="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">+ New Lead</button>
   </div>
 
@@ -76,6 +77,84 @@
       <div class="flex justify-end gap-2 mt-5">
         <button @click="showCreate=false" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Cancel</button>
         <button @click="create()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import modal -->
+  <div x-show="imp.show" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="imp.show=false">
+    <div class="glass bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold">Import leads from CSV / Excel</h3>
+        <a href="/public/sample-leads.csv" download class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">Download sample CSV</a>
+      </div>
+
+      <!-- File picker -->
+      <label class="block">
+        <span class="text-sm text-slate-500">Choose a .csv, .xls or .xlsx file</span>
+        <input type="file" accept=".csv,.xls,.xlsx" @change="onImportFile($event)"
+          class="mt-2 block w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700" />
+      </label>
+
+      <p x-show="imp.loading" class="text-sm text-slate-500 mt-4">Working…</p>
+      <p x-show="imp.error" x-text="imp.error" class="text-sm text-rose-500 mt-4"></p>
+
+      <!-- Preview (before commit) -->
+      <template x-if="imp.preview && !imp.report">
+        <div class="mt-4">
+          <p class="text-sm mb-2">
+            <span x-text="imp.preview.totalRows"></span> rows detected.
+            Columns mapped: <span class="text-slate-500" x-text="Object.entries(imp.mapping).map(([h,f]) => h+' → '+f).join(', ') || 'none — check your headers'"></span>
+          </p>
+          <div class="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-lg max-h-64">
+            <table class="w-full text-xs">
+              <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-left sticky top-0">
+                <tr>
+                  <th class="px-3 py-2">#</th>
+                  <th class="px-3 py-2">Name</th>
+                  <th class="px-3 py-2">Phone</th>
+                  <th class="px-3 py-2">Course</th>
+                  <th class="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                <template x-for="r in imp.preview.sample" :key="r.rowNumber">
+                  <tr>
+                    <td class="px-3 py-2" x-text="r.rowNumber"></td>
+                    <td class="px-3 py-2" x-text="((r.data.first_name||'')+' '+(r.data.last_name||'')).trim() || '—'"></td>
+                    <td class="px-3 py-2" x-text="r.data.phone || '—'"></td>
+                    <td class="px-3 py-2" x-text="r.data.course || '—'"></td>
+                    <td class="px-3 py-2">
+                      <span x-show="r.valid && !r.isDuplicate" class="text-emerald-600">OK</span>
+                      <span x-show="r.isDuplicate" class="text-amber-600">Duplicate</span>
+                      <span x-show="!r.valid" class="text-rose-500" x-text="r.errors.join('; ')"></span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <label class="flex items-center gap-2 mt-3 text-sm">
+            <input type="checkbox" x-model="imp.skipDuplicates" class="rounded" />
+            Skip rows whose phone already exists
+          </label>
+        </div>
+      </template>
+
+      <!-- Result report (after commit) -->
+      <template x-if="imp.report">
+        <div class="mt-4 grid grid-cols-4 gap-2 text-center">
+          <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-800"><div class="text-lg font-semibold" x-text="imp.report.total"></div><div class="text-xs text-slate-500">Total</div></div>
+          <div class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-500/10"><div class="text-lg font-semibold text-emerald-600" x-text="imp.report.imported"></div><div class="text-xs text-slate-500">Imported</div></div>
+          <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10"><div class="text-lg font-semibold text-amber-600" x-text="imp.report.skipped"></div><div class="text-xs text-slate-500">Skipped</div></div>
+          <div class="p-3 rounded-lg bg-rose-50 dark:bg-rose-500/10"><div class="text-lg font-semibold text-rose-600" x-text="imp.report.failed"></div><div class="text-xs text-slate-500">Failed</div></div>
+        </div>
+      </template>
+
+      <div class="flex justify-end gap-2 mt-5">
+        <button @click="imp.show=false" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700" x-text="imp.report ? 'Close' : 'Cancel'"></button>
+        <button x-show="imp.preview && !imp.report" @click="runImport()" :disabled="imp.loading"
+          class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50">Import <span x-text="imp.preview ? imp.preview.totalRows : ''"></span> rows</button>
       </div>
     </div>
   </div>

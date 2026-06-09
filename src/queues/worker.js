@@ -1,8 +1,11 @@
 'use strict';
 
 /**
- * Standalone worker process (run via `npm run worker` or its own PM2 app).
- * Hosts all BullMQ consumers so heavy AI/IO work runs off the web dynos.
+ * BullMQ consumers for the heavy AI/IO work (transcription, analysis,
+ * notifications, email, whatsapp). These can run either:
+ *   - in their own process via `npm run worker` (this file's main entry), or
+ *   - inside the web process (server.js calls `startWorkers`) when
+ *     INLINE_WORKERS=true (the default) so no separate worker is required.
  */
 require('module-alias/register');
 const { Worker, QueueScheduler } = require('bullmq');
@@ -26,8 +29,12 @@ const processors = {
   [QUEUES.WHATSAPP]: { handler: whatsappJob, concurrency: 10 },
 };
 
-async function start() {
-  await connectDatabase();
+/**
+ * Create and return the BullMQ workers. Safe to call from the web process:
+ * it does NOT connect the database (the caller already has) or register
+ * process signal handlers.
+ */
+function startWorkers() {
   const workers = [];
 
   for (const [name, { handler, concurrency }] of Object.entries(processors)) {
@@ -52,7 +59,14 @@ async function start() {
     workers.push(worker);
   }
 
-  logger.info(`Worker started — listening on: ${Object.keys(processors).join(', ')}`);
+  logger.info(`Queue workers listening on: ${Object.keys(processors).join(', ')}`);
+  return workers;
+}
+
+/** Standalone entry: connect the DB, start workers, handle shutdown signals. */
+async function startStandalone() {
+  await connectDatabase();
+  const workers = startWorkers();
 
   const shutdown = async () => {
     logger.info('Worker shutting down...');
@@ -63,7 +77,13 @@ async function start() {
   process.on('SIGINT', shutdown);
 }
 
-start().catch((err) => {
-  logger.error(`Worker failed to start: ${err.message}`);
-  process.exit(1);
-});
+module.exports = { startWorkers, processors };
+
+// Auto-start only when run directly (`node src/queues/worker.js`), not when
+// required by the web process for inline workers.
+if (require.main === module) {
+  startStandalone().catch((err) => {
+    logger.error(`Worker failed to start: ${err.message}`);
+    process.exit(1);
+  });
+}

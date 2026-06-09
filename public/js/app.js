@@ -25,6 +25,20 @@ const api = {
   post: (u, b) => api.request('POST', u, b),
   put: (u, b) => api.request('PUT', u, b),
   del: (u) => api.request('DELETE', u),
+  // Multipart upload (FormData). Don't set Content-Type — the browser adds the
+  // multipart boundary. Mirrors request()'s 401-refresh-then-retry behaviour.
+  async upload(url, formData) {
+    const res = await fetch(url, { method: 'POST', credentials: 'include', body: formData });
+    if (res.status === 401) {
+      const r = await fetch('/api/v1/auth/refresh', { method: 'POST', credentials: 'include' });
+      if (r.ok) return api.upload(url, formData);
+      window.location.href = '/login';
+      return null;
+    }
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message || 'Upload failed');
+    return json;
+  },
 };
 window.api = api;
 
@@ -120,6 +134,17 @@ window.leadsPage = function leadsPage() {
     loading: true,
     showCreate: false,
     form: { first_name: '', phone: '', email: '', course: '', city: '' },
+    // CSV / Excel import wizard state.
+    imp: {
+      show: false,
+      file: null,
+      preview: null,
+      mapping: {},
+      skipDuplicates: true,
+      loading: false,
+      report: null,
+      error: '',
+    },
     async init() {
       await this.load();
     },
@@ -149,6 +174,57 @@ window.leadsPage = function leadsPage() {
         alert('Call initiated');
       } catch (e) {
         alert(e.message);
+      }
+    },
+
+    // ---- CSV/Excel import ----
+    openImport() {
+      this.imp = {
+        show: true,
+        file: null,
+        preview: null,
+        mapping: {},
+        skipDuplicates: true,
+        loading: false,
+        report: null,
+        error: '',
+      };
+    },
+    async onImportFile(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      this.imp.file = file;
+      this.imp.report = null;
+      this.imp.error = '';
+      this.imp.loading = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await api.upload('/api/v1/leads/import/preview', fd);
+        this.imp.preview = res.data;
+        this.imp.mapping = res.data.suggestedMapping || {};
+      } catch (err) {
+        this.imp.error = err.message;
+      } finally {
+        this.imp.loading = false;
+      }
+    },
+    async runImport() {
+      if (!this.imp.file) return;
+      this.imp.loading = true;
+      this.imp.error = '';
+      try {
+        const fd = new FormData();
+        fd.append('file', this.imp.file);
+        fd.append('mapping', JSON.stringify(this.imp.mapping));
+        fd.append('skip_duplicates', this.imp.skipDuplicates ? 'true' : 'false');
+        const res = await api.upload('/api/v1/leads/import', fd);
+        this.imp.report = res.data;
+        await this.load();
+      } catch (err) {
+        this.imp.error = err.message;
+      } finally {
+        this.imp.loading = false;
       }
     },
   };
