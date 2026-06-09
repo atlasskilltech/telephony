@@ -56,6 +56,12 @@ const config = {
     // Restrict to a Google Workspace domain (used as the `hd` hint and an
     // extra server-side guard). Empty string disables the restriction.
     hostedDomain: process.env.GOOGLE_HOSTED_DOMAIN || 'atlasuniversity.edu.in',
+    // Accepted `aud` values for ID tokens (mobile Google Sign-In). The web
+    // client id plus any Android/iOS OAuth client ids.
+    allowedAudiences: [
+      process.env.GOOGLE_CLIENT_ID,
+      ...toList(process.env.GOOGLE_MOBILE_CLIENT_IDS),
+    ].filter(Boolean),
   },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret',

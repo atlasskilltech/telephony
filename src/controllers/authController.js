@@ -46,6 +46,20 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
+// Mobile Google Sign-In: app sends the Google ID token; we verify and issue JWTs.
+const googleLogin = asyncHandler(async (req, res) => {
+  const result = await authService.loginWithGoogleIdToken(req.body.id_token, requestContext(req));
+  setAuthCookies(res, result);
+  return success(res, {
+    message: 'Logged in with Google',
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    },
+  });
+});
+
 const refresh = asyncHandler(async (req, res) => {
   const token = req.body.refresh_token || (req.cookies && req.cookies.refresh_token);
   const result = await authService.refresh(token, requestContext(req));
@@ -108,6 +122,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 module.exports = {
   login,
+  googleLogin,
   refresh,
   logout,
   logoutAll,

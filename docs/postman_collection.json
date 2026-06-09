@@ -44,6 +44,30 @@
           }
         },
         {
+          "name": "Google login (mobile)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data) {",
+                  "  pm.collectionVariables.set('accessToken', j.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', j.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "description": "Native Google Sign-In: the app obtains a Google ID token and posts it here. Server verifies audience + verified email + hosted domain, then returns JWTs.",
+            "url": "{{baseUrl}}/auth/google",
+            "body": { "mode": "raw", "raw": "{\n  \"id_token\": \"<google-id-token-from-the-app>\",\n  \"device_name\": \"Android app\"\n}" }
+          }
+        },
+        {
           "name": "Refresh",
           "event": [
             {
