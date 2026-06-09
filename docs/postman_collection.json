@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "ATLAS Telephony API",
-    "description": "Mobile/web REST API. Set {{baseUrl}} and run Auth > Login first; the access/refresh tokens are saved to collection variables automatically. All requests use bearer auth except the public Telephony webhook.",
+    "description": "REST API for ATLAS Telephony. Set {{baseUrl}} and run Auth > Login first; the access/refresh tokens are saved to collection variables automatically. All requests use bearer auth except the public Telephony webhook. Note: the browser app signs in via Google OAuth (GET /google → /google/callback); this password Login endpoint is for API clients / admin break-glass.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -202,6 +202,15 @@
           }
         },
         {
+          "name": "Merge duplicate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/leads/1/merge",
+            "body": { "mode": "raw", "raw": "{\n  \"duplicate_id\": 2\n}" }
+          }
+        },
+        {
           "name": "Import preview",
           "request": {
             "method": "POST",
@@ -300,6 +309,19 @@
             "method": "GET",
             "description": "Returns { data: { url } } — a 15-min presigned S3 URL or the local stream route. 404 until the recording is archived.",
             "url": "{{baseUrl}}/calls/1/recording-url"
+          }
+        },
+        {
+          "name": "Stream recording (local)",
+          "request": {
+            "method": "GET",
+            "description": "Streams a recording from local storage (used when STORAGE_DRIVER=local). The key comes from the recording-url response.",
+            "url": {
+              "raw": "{{baseUrl}}/calls/recordings/stream?key=recordings/2026/06/09/call-1.mp3",
+              "host": ["{{baseUrl}}"],
+              "path": ["calls", "recordings", "stream"],
+              "query": [{ "key": "key", "value": "recordings/2026/06/09/call-1.mp3" }]
+            }
           }
         }
       ]
