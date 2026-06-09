@@ -167,6 +167,11 @@ window.leadsPage = function leadsPage() {
     loading: true,
     showCreate: false,
     form: { first_name: '', phone: '', email: '', course: '', city: '' },
+    // Assignment (single + bulk).
+    selected: {},
+    assignTo: '',
+    assignees: [],
+    assigning: false,
     // CSV / Excel import wizard state.
     imp: {
       show: false,
@@ -180,9 +185,11 @@ window.leadsPage = function leadsPage() {
     },
     async init() {
       await this.load();
+      this.loadAssignees();
     },
     async load() {
       this.loading = true;
+      this.selected = {};
       const q = new URLSearchParams(
         Object.entries(this.filters).filter(([, v]) => v !== '' && v != null)
       ).toString();
@@ -190,6 +197,42 @@ window.leadsPage = function leadsPage() {
       this.leads = res.data;
       this.meta = res.meta;
       this.loading = false;
+    },
+    // Only succeeds for users with leads.assign — drives the assign UI.
+    async loadAssignees() {
+      try {
+        this.assignees = (await api.get('/api/v1/leads/assignees')).data || [];
+      } catch (e) {
+        this.assignees = [];
+      }
+    },
+    toggle(id) { this.selected[id] = !this.selected[id]; },
+    toggleAll(e) {
+      const v = e.target.checked;
+      this.leads.forEach((l) => { this.selected[l.id] = v; });
+    },
+    allSelected() {
+      return this.leads.length > 0 && this.leads.every((l) => this.selected[l.id]);
+    },
+    selectedIds() {
+      return Object.keys(this.selected).filter((k) => this.selected[k]).map(Number);
+    },
+    selectedCount() { return this.selectedIds().length; },
+    async assignSelected() {
+      const ids = this.selectedIds();
+      if (!ids.length || !this.assignTo) return;
+      this.assigning = true;
+      try {
+        const res = await api.post('/api/v1/leads/assign-bulk', { ids, user_id: Number(this.assignTo) });
+        const r = res.data || {};
+        if (r.failed) alert(`Assigned ${r.assigned}, failed ${r.failed}.`);
+        this.assignTo = '';
+        await this.load();
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        this.assigning = false;
+      }
     },
     async create() {
       try {

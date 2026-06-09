@@ -210,6 +210,17 @@
             "body": { "mode": "raw", "raw": "{\n  \"duplicate_id\": 2\n}" }
           }
         },
+        { "name": "Assignees (counselors)", "request": { "method": "GET", "url": "{{baseUrl}}/leads/assignees" } },
+        {
+          "name": "Assign bulk",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "description": "Assign many leads at once. Provide ids[] and a user_id (or strategy).",
+            "url": "{{baseUrl}}/leads/assign-bulk",
+            "body": { "mode": "raw", "raw": "{\n  \"ids\": [1, 2, 3],\n  \"user_id\": 4\n}" }
+          }
+        },
         {
           "name": "Import preview",
           "request": {
@@ -400,6 +411,50 @@
             }
           }
         }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users?page=1&limit=20&search=&role=&status=",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "search", "value": "" },
+                { "key": "role", "value": "", "description": "role slug e.g. counselor" },
+                { "key": "status", "value": "", "description": "active | inactive | suspended" }
+              ]
+            }
+          }
+        },
+        { "name": "Roles", "request": { "method": "GET", "url": "{{baseUrl}}/users/roles" } },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "description": "Sign-in is Google-only; password is optional (a random one is stored).",
+            "url": "{{baseUrl}}/users",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Neha Counselor\",\n  \"email\": \"neha@atlasuniversity.edu.in\",\n  \"phone\": \"9876500009\",\n  \"role_slug\": \"counselor\",\n  \"agent_extension\": \"1012\"\n}" }
+          }
+        },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/users/2",
+            "body": { "mode": "raw", "raw": "{\n  \"role_slug\": \"team_leader\",\n  \"status\": \"active\"\n}" }
+          }
+        },
+        { "name": "Deactivate", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/2" } }
       ]
     },
     {

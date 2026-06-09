@@ -31,6 +31,10 @@ router.post(
   importController.commit
 );
 
+// Assignment helpers (registered before /:id so the literal paths win).
+router.get('/assignees', requirePermission('leads.assign'), leadController.assignees);
+router.post('/assign-bulk', requirePermission('leads.assign'), leadController.assignBulk);
+
 router.get('/:id', requirePermission('leads.view'), leadController.show);
 router.put('/:id', requirePermission('leads.update'), validate(leadValidator.update), leadController.update);
 router.delete('/:id', requirePermission('leads.delete'), leadController.destroy);

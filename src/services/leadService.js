@@ -164,6 +164,38 @@ class LeadService {
     return leadRepository.findFullById(lead.id);
   }
 
+  /** Active counselors for the manual-assignment dropdown. */
+  async assignees() {
+    return assignmentService.activeCounselors();
+  }
+
+  /**
+   * Assign many leads at once to a counselor (or via a strategy). Returns a
+   * per-lead report so the UI can show partial failures.
+   */
+  async assignBulk(user, { ids = [], userId, strategy, note } = {}) {
+    const list = [...new Set((ids || []).map(Number).filter(Boolean))];
+    if (!list.length) throw ApiError.badRequest('No leads selected');
+    if (!userId && !strategy) throw ApiError.badRequest('Choose a counselor or a strategy');
+
+    const report = { total: list.length, assigned: 0, failed: 0, errors: [] };
+    for (const id of list) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await this.assign(user, id, {
+          userId,
+          strategy: strategy || ASSIGNMENT_STRATEGIES.MANUAL,
+          note,
+        });
+        report.assigned += 1;
+      } catch (e) {
+        report.failed += 1;
+        report.errors.push({ id, message: e.message });
+      }
+    }
+    return report;
+  }
+
   async addNote(user, id, note) {
     const lead = await this.getById(user, id);
     return db.ActivityLog.create({

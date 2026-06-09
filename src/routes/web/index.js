@@ -22,6 +22,7 @@ router.get('/logout', webController.doLogout);
 router.get('/dashboard', auth, webController.dashboard);
 router.get('/leads', auth, webController.leads);
 router.get('/calls', auth, webController.calls);
+router.get('/users', auth, webController.users);
 
 // Hidden pages — kept out of the UI; direct URLs redirect to the dashboard.
 router.get(['/pipeline', '/followups', '/reports'], (req, res) => res.redirect('/dashboard'));
