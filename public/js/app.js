@@ -83,43 +83,68 @@ window.notifBell = function notifBell() {
   };
 };
 
-// ---- Dashboard page component ----
+// ---- Call analysis dashboard component ----
 window.dashboardPage = function dashboardPage() {
   return {
-    stats: {},
+    d: {},
     loading: true,
+    metricCards: [],
+    _charts: {},
+    scoreColor(s) { return s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#f43f5e'; },
+    scoreBg(s) { return s >= 80 ? 'rgba(16,185,129,.12)' : s >= 60 ? 'rgba(245,158,11,.12)' : 'rgba(244,63,94,.12)'; },
     async init() {
-      const res = await api.get('/api/v1/dashboard');
-      this.stats = res.data.stats;
+      const res = await api.get('/api/v1/dashboard/call-analytics');
+      this.d = res.data || {};
+      this.buildCards();
       this.loading = false;
-      this.renderFunnel(res.data.funnel);
-      this.renderTrend(res.data.callTrend);
+      this.$nextTick(() => this.renderCharts());
     },
-    renderFunnel(funnel) {
-      const ctx = document.getElementById('funnelChart');
-      if (!ctx) return;
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: funnel.map((f) => f.stage.replace(/_/g, ' ')),
-          datasets: [{ label: 'Leads', data: funnel.map((f) => f.count), backgroundColor: '#6366f1', borderRadius: 6 }],
-        },
-        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
-      });
+    buildCards() {
+      const m = this.d.metrics || {};
+      const delta = (x, suffix = '') => {
+        const v = (x && x.delta) || 0;
+        return `${v > 0 ? '+' : ''}${v}${suffix} vs prev`;
+      };
+      this.metricCards = [
+        { key: 'totalCalls', label: 'Total calls', display: (m.totalCalls?.value ?? 0).toLocaleString(), dir: m.totalCalls?.dir, deltaText: delta(m.totalCalls) },
+        { key: 'avgScore', label: 'Avg score', display: `${m.avgScore?.value ?? 0}/100`, dir: m.avgScore?.dir, deltaText: delta(m.avgScore, ' pts') },
+        { key: 'handle', label: 'Avg handle time', display: fmt.duration(m.avgHandleSeconds?.value || 0), dir: m.avgHandleSeconds?.dir, deltaText: delta(m.avgHandleSeconds, 's') },
+        { key: 'csat', label: 'CSAT proxy', display: `${m.csat?.value ?? 0}%`, dir: m.csat?.dir, deltaText: delta(m.csat, '%') },
+        { key: 'resolution', label: 'Resolution', display: `${m.resolution?.value ?? 0}%`, dir: m.resolution?.dir, deltaText: delta(m.resolution, '%') },
+      ];
     },
-    renderTrend(trend) {
-      const ctx = document.getElementById('trendChart');
-      if (!ctx) return;
-      new Chart(ctx, {
-        type: 'line',
+    renderCharts() {
+      if (!window.Chart) { setTimeout(() => this.renderCharts(), 80); return; }
+      Object.values(this._charts).forEach((c) => c && c.destroy());
+
+      const t = this.d.scoreTrend || [];
+      this._charts.trend = new Chart(this.$refs.trend.getContext('2d'), {
         data: {
-          labels: trend.map((t) => t.date),
+          labels: t.map((x) => x.label),
           datasets: [
-            { label: 'Total', data: trend.map((t) => t.total), borderColor: '#8b5cf6', tension: 0.3 },
-            { label: 'Connected', data: trend.map((t) => t.connected), borderColor: '#22c55e', tension: 0.3 },
+            { type: 'bar', label: 'Calls', data: t.map((x) => x.calls), backgroundColor: 'rgba(136,135,128,0.35)', yAxisID: 'y1', order: 2 },
+            { type: 'line', label: 'Avg score', data: t.map((x) => x.avgScore), borderColor: '#378ADD', backgroundColor: '#378ADD', tension: 0.35, yAxisID: 'y', pointRadius: 3, spanGaps: true, order: 1 },
           ],
         },
-        options: { plugins: { legend: { position: 'bottom' } } },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10 } } },
+          scales: { y: { position: 'left', min: 0, max: 100, title: { display: true, text: 'Score' } }, y1: { position: 'right', grid: { display: false }, beginAtZero: true, title: { display: true, text: 'Volume' } } },
+        },
+      });
+
+      const s = (this.d.sentimentSplit && this.d.sentimentSplit.percent) || { positive: 0, neutral: 0, negative: 0 };
+      this._charts.sent = new Chart(this.$refs.sent.getContext('2d'), {
+        type: 'doughnut',
+        data: { labels: ['Positive', 'Neutral', 'Negative'], datasets: [{ data: [s.positive, s.neutral, s.negative], backgroundColor: ['#10b981', '#888780', '#f43f5e'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false } } },
+      });
+
+      const q = this.d.qaRadar || [];
+      this._charts.radar = new Chart(this.$refs.radar.getContext('2d'), {
+        type: 'radar',
+        data: { labels: q.map((x) => x.label), datasets: [{ label: 'Team avg', data: q.map((x) => x.value), borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.18)', pointRadius: 2, pointBackgroundColor: '#378ADD' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { r: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 9 } }, pointLabels: { font: { size: 11 } } } } },
       });
     },
   };

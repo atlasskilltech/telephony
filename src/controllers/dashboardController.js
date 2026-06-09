@@ -16,6 +16,10 @@ const callTrend = asyncHandler(async (req, res) =>
   success(res, { data: await dashboardService.callTrend(req.user, Number(req.query.days) || 14) })
 );
 
+const callAnalytics = asyncHandler(async (req, res) =>
+  success(res, { data: await dashboardService.callAnalytics(req.user, Number(req.query.days) || 30) })
+);
+
 const overview = asyncHandler(async (req, res) => {
   const [s, f, t] = await Promise.all([
     dashboardService.counselorStats(req.user),
@@ -25,4 +29,4 @@ const overview = asyncHandler(async (req, res) => {
   return success(res, { data: { stats: s, funnel: f, callTrend: t } });
 });
 
-module.exports = { stats, funnel, callTrend, overview };
+module.exports = { stats, funnel, callTrend, callAnalytics, overview };

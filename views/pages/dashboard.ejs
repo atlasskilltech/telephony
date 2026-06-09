@@ -1,37 +1,114 @@
 <div x-data="dashboardPage()" x-init="init()">
-  <!-- KPI cards -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <% const cards = [
-      { key: 'todaysLeads', label: "Today's Leads", color: 'from-indigo-500 to-blue-500' },
-      { key: 'todaysCalls', label: "Today's Calls", color: 'from-purple-500 to-fuchsia-500' },
-      { key: 'connectedCalls', label: 'Connected', color: 'from-emerald-500 to-teal-500' },
-      { key: 'missedCalls', label: 'Missed', color: 'from-rose-500 to-orange-500' },
-      { key: 'followupsDue', label: 'Follow-ups Due', color: 'from-amber-500 to-yellow-500' },
-      { key: 'admissionsClosed', label: 'Admissions', color: 'from-green-500 to-emerald-600' },
-      { key: 'conversionRate', label: 'Conversion %', color: 'from-cyan-500 to-sky-500' },
-      { key: 'talkTimeSeconds', label: 'Talk Time', color: 'from-violet-500 to-indigo-500', fmt: 'duration' },
-    ]; %>
-    <% cards.forEach(function(c){ %>
-      <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-        <div class="flex items-center justify-between">
-          <p class="text-xs text-slate-500"><%= c.label %></p>
-          <span class="w-2.5 h-2.5 rounded-full bg-gradient-to-br <%= c.color %>"></span>
-        </div>
-        <p class="text-2xl font-semibold mt-2"
-           x-text="<%= c.fmt === 'duration' ? `fmt.duration(stats.${c.key})` : `stats.${c.key} ?? '—'` %>">—</p>
-      </div>
-    <% }); %>
+  <div class="mb-5">
+    <h1 class="text-xl font-semibold">Call analysis dashboard</h1>
+    <p class="text-sm text-slate-500" x-text="`Telephony QA · last ${d.rangeDays||30} days · ${(d.analyzedCount||0).toLocaleString()} calls analyzed`"></p>
   </div>
 
-  <!-- Charts -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <!-- Metric cards -->
+  <div class="grid gap-3 mb-5" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+    <template x-for="m in metricCards" :key="m.key">
+      <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+        <div class="text-xs text-slate-500" x-text="m.label"></div>
+        <div class="text-2xl font-semibold mt-1" x-text="m.display"></div>
+        <div class="text-[11px] mt-1 flex items-center gap-1"
+             :class="m.dir==='up' ? 'text-emerald-600' : (m.dir==='down' ? 'text-rose-600' : 'text-slate-400')">
+          <span x-show="m.dir==='up'">▲</span><span x-show="m.dir==='down'">▼</span>
+          <span x-text="m.deltaText"></span>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Trend + sentiment -->
+  <div class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mb-4">
     <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
-      <h3 class="font-medium mb-4">Pipeline Funnel</h3>
-      <canvas id="funnelChart" height="140"></canvas>
+      <h3 class="font-medium mb-4">Score trend &amp; call volume</h3>
+      <div class="relative w-full" style="height:240px;"><canvas x-ref="trend"></canvas></div>
     </div>
     <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
-      <h3 class="font-medium mb-4">Call Activity (14 days)</h3>
-      <canvas id="trendChart" height="140"></canvas>
+      <h3 class="font-medium mb-3">Sentiment split</h3>
+      <div class="flex flex-wrap gap-3 text-xs text-slate-500 mb-3">
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>Positive <span x-text="(d.sentimentSplit?.percent?.positive||0)+'%'"></span></span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#888780"></span>Neutral <span x-text="(d.sentimentSplit?.percent?.neutral||0)+'%'"></span></span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500"></span>Negative <span x-text="(d.sentimentSplit?.percent?.negative||0)+'%'"></span></span>
+      </div>
+      <div class="relative w-full" style="height:190px;"><canvas x-ref="sent"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Radar + leaderboard -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+      <h3 class="font-medium mb-4">QA parameter scores (team avg)</h3>
+      <div class="relative w-full" style="height:280px;"><canvas x-ref="radar"></canvas></div>
+    </div>
+    <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+      <h3 class="font-medium mb-4">Agent leaderboard</h3>
+      <table class="w-full text-sm">
+        <thead class="text-slate-500 text-left text-xs">
+          <tr><th class="py-2 font-medium">Agent</th><th class="py-2 font-medium">Calls</th><th class="py-2 font-medium">Avg score</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+          <template x-for="a in (d.agentLeaderboard||[])" :key="a.name">
+            <tr>
+              <td class="py-2" x-text="a.name"></td>
+              <td class="py-2" x-text="a.calls"></td>
+              <td class="py-2">
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 h-1.5 rounded bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                    <div class="h-full rounded" :style="`width:${a.avgScore}%;background:${scoreColor(a.avgScore)}`"></div>
+                  </div>
+                  <span class="font-medium w-7 text-right" x-text="a.avgScore"></span>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="!(d.agentLeaderboard||[]).length"><td colspan="3" class="py-6 text-center text-slate-400">No data yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent calls -->
+  <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-medium">Recent calls</h3>
+      <span class="text-xs text-slate-400">Click a row to open the calls page</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-slate-500 text-left text-xs">
+          <tr>
+            <th class="py-2 px-2 font-medium">Call</th><th class="py-2 px-2 font-medium">Agent</th>
+            <th class="py-2 px-2 font-medium">Type</th><th class="py-2 px-2 font-medium">Dur</th>
+            <th class="py-2 px-2 font-medium">Sentiment</th><th class="py-2 px-2 font-medium">Score</th>
+            <th class="py-2 px-2 font-medium">Outcome</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+          <template x-for="c in (d.recentCalls||[])" :key="c.id">
+            <tr class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40" @click="window.location.href='/calls'">
+              <td class="py-2 px-2 font-medium" x-text="'#'+c.id"></td>
+              <td class="py-2 px-2" x-text="c.agent"></td>
+              <td class="py-2 px-2 capitalize" x-text="c.type || '—'"></td>
+              <td class="py-2 px-2" x-text="fmt.duration(c.durationSeconds)"></td>
+              <td class="py-2 px-2">
+                <span x-show="c.sentiment" class="px-2 py-0.5 rounded-md text-xs capitalize"
+                  :class="c.sentiment==='positive' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10' : (c.sentiment==='negative' ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10' : 'bg-sky-50 text-sky-600 dark:bg-sky-500/10')"
+                  x-text="c.sentiment"></span>
+                <span x-show="!c.sentiment" class="text-slate-400 text-xs">—</span>
+              </td>
+              <td class="py-2 px-2">
+                <span x-show="c.score!=null" class="px-2 py-0.5 rounded-md text-xs font-medium"
+                  :style="`background:${scoreBg(c.score)};color:${scoreColor(c.score)}`" x-text="c.score"></span>
+                <span x-show="c.score==null" class="text-slate-400 text-xs">—</span>
+              </td>
+              <td class="py-2 px-2 capitalize" x-text="c.outcome"></td>
+            </tr>
+          </template>
+          <tr x-show="!(d.recentCalls||[]).length"><td colspan="7" class="py-6 text-center text-slate-400">No calls yet</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

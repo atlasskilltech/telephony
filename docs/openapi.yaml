@@ -84,6 +84,12 @@ paths:
     get:
       summary: Dashboard overview (stats, funnel, trend)
       responses: { '200': { description: Overview } }
+  /dashboard/call-analytics:
+    get:
+      summary: Call-QA analytics (metrics, score trend, sentiment, QA radar, leaderboard, recent calls)
+      parameters:
+        - { name: days, in: query, schema: { type: integer, default: 30 } }
+      responses: { '200': { description: Call analytics } }
   /leads:
     get:
       summary: List leads

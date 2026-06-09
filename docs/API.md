@@ -37,6 +37,7 @@ rotate on every use and are revocable server-side.
 | GET `/dashboard/stats` | KPI cards |
 | GET `/dashboard/funnel` | leads per pipeline stage |
 | GET `/dashboard/call-trend?days=14` | daily call volume |
+| GET `/dashboard/call-analytics?days=30` | call-QA analytics: metrics (+deltas), weekly score trend & volume, sentiment split, QA-parameter radar, agent leaderboard, recent calls |
 
 ## Leads — `/leads`
 | Method | Path | Permission | Notes |

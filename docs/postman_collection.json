@@ -111,6 +111,18 @@
       "name": "Dashboard",
       "item": [
         { "name": "Overview", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard" } },
+        {
+          "name": "Call analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/call-analytics?days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "call-analytics"],
+              "query": [{ "key": "days", "value": "30" }]
+            }
+          }
+        },
         { "name": "Stats", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/stats" } },
         { "name": "Funnel", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/funnel" } },
         {
