@@ -55,6 +55,7 @@ const list = asyncHandler(async (req, res) => {
       { model: db.User, as: 'agent', attributes: ['id', 'name'] },
       { model: db.Lead, as: 'lead', include: [{ model: db.Student, as: 'student' }] },
       { model: db.CallRecording, as: 'recording' },
+      { model: db.CallAnalysis, as: 'analysis' },
     ],
     order: [['started_at', 'DESC']],
     limit,
