@@ -54,13 +54,53 @@ rotate on every use and are revocable server-side.
 | POST | `/leads/import` | `leads.import` | multipart `file, mapping(JSON), source_id, skip_duplicates` |
 
 ## Calls — `/calls`
-| POST `/calls/click-to-call` | `calls.create` | `lead_id` or `to_number` |
-| GET `/calls` | `calls.view` | filter `lead_id, status` |
-| GET `/calls/:id` | `calls.view` | incl. recording, transcript, analysis |
-| GET `/calls/:id/recording-url` | `calls.recording.view` | signed/stream URL |
+| Method | Path | Permission | Notes |
+|--------|------|-----------|-------|
+| POST | `/calls/click-to-call` | `calls.create` | `lead_id` and/or `to_number` (one required) |
+| GET | `/calls` | `calls.view` | filters `lead_id, status`; paginated. Counselors see only their own calls |
+| GET | `/calls/:id` | `calls.view` | full call incl. `recording`, `transcript`, `analysis`, `lead` |
+| GET | `/calls/:id/recording-url` | `calls.recording.view` | time-limited URL to the archived recording |
+| GET | `/calls/recordings/stream?key=` | `calls.recording.view` | streams a local-storage recording (used when `STORAGE_DRIVER=local`) |
+
+**`POST /calls/click-to-call`** dials the agent's `agent_extension`/`phone`,
+bridges to the lead's number, creates a `call_logs` row (`status` from the
+provider) and returns `201 { data: <call> }`.
+
+**`GET /calls/:id/recording-url`** returns `{ data: { url } }`. The recording
+must be archived (have a `storage_key`) or it responds `404 Recording not
+available`. For S3 the `url` is a presigned `GetObject` link valid for **15
+minutes**; for local storage it is the `…/recordings/stream` route above.
+
+### Call recording → storage lifecycle
+1. A provider status callback hits `POST /telephony/webhook/:provider`.
+2. On a `completed` call that carries a `recordingUrl`, a `call_recordings`
+   row is created with `status: 'pending'` and a **transcription** job is
+   enqueued.
+3. The worker (`npm run worker`) downloads the provider audio and archives it
+   via `StorageService.putObject` under a date-partitioned key
+   `recordings/YYYY/MM/DD/call-<id>.mp3`, then sets
+   `storage_driver`, `storage_key`, `file_size_bytes`, `status: 'archived'`,
+   `archived_at`. Download/upload failures mark the row `status: 'failed'`
+   and the job retries (3 attempts, exponential backoff).
+4. Transcription (Whisper) and AI analysis run next, off the request path.
+
+`call_recordings.status`: `pending` → `archived` (or `failed`).
+
+### Storage configuration
+| Env | Default | Notes |
+|-----|---------|-------|
+| `STORAGE_DRIVER` | `local` | `s3` or `local` |
+| `LOCAL_STORAGE_PATH` | `./storage` | base dir for the local driver |
+| `AWS_S3_BUCKET` | – | **required** when `STORAGE_DRIVER=s3` |
+| `AWS_REGION` | `ap-south-1` | |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | – | optional — omit to use the instance's IAM role / default AWS credential provider chain |
 
 ## Telephony webhooks (public) — `/telephony`
-| POST/GET `/telephony/webhook/:provider` | provider status callbacks (signature-verified) |
+| POST/GET `/telephony/webhook/:provider` | provider status callbacks (signature-verified; no auth) |
+
+Unsigned/invalid requests get `401`. The handler is idempotent on
+`provider_call_id` (find-or-create), so providers may retry safely. Always
+responds `200 { received: true }` once accepted.
 
 ## Follow-ups — `/followups`
 | GET `/followups?view=list\|kanban&status=&from=&to=` | list/board |

@@ -16,24 +16,36 @@ module.exports = async function transcriptionJob(job) {
   const recording = await db.CallRecording.findByPk(recordingId);
   if (!recording) throw new Error(`Recording ${recordingId} not found`);
 
-  // 1. Download the audio.
-  const response = await axios.get(sourceUrl, { responseType: 'arraybuffer', timeout: 60000 });
-  const buffer = Buffer.from(response.data);
-
-  // 2. Archive to durable storage with a date-partitioned key.
+  // 1 + 2. Download the provider audio and archive it to durable storage with a
+  // date-partitioned key. On failure mark the recording failed (the job still
+  // throws so BullMQ can retry) instead of leaving it stuck in 'pending'.
   const filename = `call-${callId}.mp3`;
-  const key = storageService.buildRecordingKey(filename, new Date());
-  const stored = await storageService.putObject(key, buffer, 'audio/mpeg');
-  await recording.update({
-    storage_driver: stored.driver,
-    storage_key: stored.key,
-    file_size_bytes: buffer.length,
-    status: 'archived',
-    archived_at: new Date(),
-  });
+  let buffer;
+  try {
+    const response = await axios.get(sourceUrl, { responseType: 'arraybuffer', timeout: 60000 });
+    buffer = Buffer.from(response.data);
 
-  // 3. Transcribe.
-  const transcript = await db.CallTranscript.create({ call_id: callId, status: 'processing' });
+    const key = storageService.buildRecordingKey(filename, new Date());
+    const stored = await storageService.putObject(key, buffer, 'audio/mpeg');
+    await recording.update({
+      storage_driver: stored.driver,
+      storage_key: stored.key,
+      file_size_bytes: buffer.length,
+      status: 'archived',
+      archived_at: new Date(),
+    });
+  } catch (err) {
+    await recording.update({ status: 'failed' });
+    logger.error(`Failed to archive recording ${recordingId} for call ${callId}: ${err.message}`);
+    throw err;
+  }
+
+  // 3. Transcribe. findOrCreate keeps retries from inserting duplicate rows
+  // (the CallLog -> transcript association is hasOne).
+  const [transcript] = await db.CallTranscript.findOrCreate({
+    where: { call_id: callId },
+    defaults: { call_id: callId, status: 'processing' },
+  });
   try {
     const result = await aiService.transcribe(buffer, filename);
     await transcript.update({
