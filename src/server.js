@@ -8,6 +8,7 @@ const logger = require('./utils/logger');
 const { connectDatabase } = require('./config/database');
 const { initSocket } = require('./sockets');
 const { startScheduler } = require('./queues/scheduler');
+const { startWorkers } = require('./queues/worker');
 
 async function bootstrap() {
   await connectDatabase();
@@ -15,6 +16,13 @@ async function bootstrap() {
   const server = http.createServer(app);
   initSocket(server);
   startScheduler();
+
+  // Run the queue consumers in-process unless a dedicated worker is used, so a
+  // single `npm start` handles transcription/analysis with no separate worker.
+  if (config.queue.inlineWorkers) {
+    startWorkers();
+    logger.info('Inline queue workers enabled (INLINE_WORKERS=true).');
+  }
 
   server.listen(config.app.port, () => {
     logger.info(`${config.app.name} running on port ${config.app.port} [${config.env}]`);

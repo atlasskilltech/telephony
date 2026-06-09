@@ -40,6 +40,12 @@ const config = {
     password: process.env.REDIS_PASSWORD || undefined,
     db: toInt(process.env.REDIS_DB, 0),
   },
+  queue: {
+    // Run the BullMQ consumers inside the web process so a single `npm start`
+    // handles transcription/analysis with no separate `npm run worker`. Set
+    // INLINE_WORKERS=false when running a dedicated worker process at scale.
+    inlineWorkers: toBool(process.env.INLINE_WORKERS, true),
+  },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret',

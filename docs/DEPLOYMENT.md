@@ -49,8 +49,15 @@ The webhook updates `call_logs`, stores the recording reference and enqueues the
 transcription → analysis pipeline.
 
 ## 5. Scaling notes
+- **Workers**: by default (`INLINE_WORKERS=true`) the web process also runs the
+  BullMQ consumers, so a single `npm start` handles transcription/analysis with
+  **no separate worker process**. For higher throughput set
+  `INLINE_WORKERS=false` on the web app and run a dedicated `npm run worker`
+  (the `crm-worker` PM2 app / Compose `worker` service).
 - **Web** scales horizontally (stateless; sessions/refresh tokens in DB, rate
-  limits in Redis). Run behind the Nginx upstream / a load balancer.
+  limits in Redis). Run behind the Nginx upstream / a load balancer. When
+  running multiple web replicas with inline workers, prefer a dedicated worker
+  and `INLINE_WORKERS=false` so job concurrency stays predictable.
 - **Worker** scales independently; tune per-queue `concurrency` in
   `src/queues/worker.js`. Heavy Whisper/GPT load → add worker replicas.
 - **MySQL**: enable read replicas for reporting; the schema is indexed for
