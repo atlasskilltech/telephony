@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Admission CRM & Telephony API",
-    "description": "Mobile/web REST API. Set {{baseUrl}} and run Login first; the access/refresh tokens are saved to collection variables automatically.",
+    "description": "Mobile/web REST API. Set {{baseUrl}} and run Auth > Login first; the access/refresh tokens are saved to collection variables automatically. All requests use bearer auth except the public Telephony webhook.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -43,28 +43,110 @@
             }
           }
         },
-        { "name": "Me", "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" } },
         {
           "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data) {",
+                  "  pm.collectionVariables.set('accessToken', j.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', j.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/auth/refresh",
             "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}" }
           }
-        }
+        },
+        { "name": "Me (user + permissions)", "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" } },
+        { "name": "Sessions", "request": { "method": "GET", "url": "{{baseUrl}}/auth/sessions" } },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/change-password",
+            "body": { "mode": "raw", "raw": "{\n  \"current_password\": \"Admin@12345\",\n  \"new_password\": \"Admin@67890\"\n}" }
+          }
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/forgot-password",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@admissioncrm.local\"\n}" }
+          }
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/reset-password",
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"<reset-token>\",\n  \"new_password\": \"Admin@67890\"\n}" }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/logout",
+            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}" }
+          }
+        },
+        { "name": "Logout all", "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout-all" } }
       ]
     },
     {
       "name": "Dashboard",
       "item": [
-        { "name": "Overview", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard" } }
+        { "name": "Overview", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard" } },
+        { "name": "Stats", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/stats" } },
+        { "name": "Funnel", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard/funnel" } },
+        {
+          "name": "Call trend",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/call-trend?days=14",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "call-trend"],
+              "query": [{ "key": "days", "value": "14" }]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Leads",
       "item": [
-        { "name": "List", "request": { "method": "GET", "url": "{{baseUrl}}/leads?page=1&limit=20" } },
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/leads?page=1&limit=20&search=&pipeline_stage=",
+              "host": ["{{baseUrl}}"],
+              "path": ["leads"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "search", "value": "" },
+                { "key": "pipeline_stage", "value": "" }
+              ]
+            }
+          }
+        },
         {
           "name": "Create",
           "request": {
@@ -73,33 +155,240 @@
             "url": "{{baseUrl}}/leads",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"first_name\": \"Asha\",\n  \"phone\": \"9876543210\",\n  \"email\": \"asha@example.com\",\n  \"course\": \"B.Tech CSE\",\n  \"city\": \"Mumbai\"\n}"
+              "raw": "{\n  \"first_name\": \"Asha\",\n  \"phone\": \"9876543210\",\n  \"email\": \"asha@example.com\",\n  \"course\": \"B.Tech CSE\",\n  \"city\": \"Mumbai\",\n  \"auto_assign\": true,\n  \"strategy\": \"round_robin\"\n}"
             }
           }
         },
         { "name": "Get", "request": { "method": "GET", "url": "{{baseUrl}}/leads/1" } },
-        { "name": "Timeline", "request": { "method": "GET", "url": "{{baseUrl}}/leads/1/timeline" } }
+        {
+          "name": "Update",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/leads/1",
+            "body": { "mode": "raw", "raw": "{\n  \"pipeline_stage\": \"contacted\"\n}" }
+          }
+        },
+        { "name": "Delete", "request": { "method": "DELETE", "url": "{{baseUrl}}/leads/1" } },
+        { "name": "Timeline", "request": { "method": "GET", "url": "{{baseUrl}}/leads/1/timeline" } },
+        {
+          "name": "Add note",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/leads/1/notes",
+            "body": { "mode": "raw", "raw": "{\n  \"note\": \"Called, will follow up next week.\"\n}" }
+          }
+        },
+        {
+          "name": "Assign",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/leads/1/assign",
+            "body": { "mode": "raw", "raw": "{\n  \"strategy\": \"round_robin\"\n}" }
+          }
+        },
+        {
+          "name": "Import preview",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/leads/import/preview",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": "" }]
+            }
+          }
+        },
+        {
+          "name": "Import commit",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/leads/import",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "" },
+                { "key": "mapping", "value": "{\"first_name\":\"Name\",\"phone\":\"Mobile\"}", "type": "text" },
+                { "key": "source_id", "value": "1", "type": "text" },
+                { "key": "skip_duplicates", "value": "true", "type": "text" }
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Calls",
       "item": [
         {
-          "name": "Click to call",
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/calls?page=1&limit=20&lead_id=&status=",
+              "host": ["{{baseUrl}}"],
+              "path": ["calls"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "lead_id", "value": "" },
+                { "key": "status", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload recording (mobile dialer)",
+          "request": {
+            "method": "POST",
+            "description": "No telephony provider: the agent calls from their phone and the app uploads the recording here. multipart/form-data with the audio in the 'recording' field plus call metadata. Idempotent on client_call_id.",
+            "url": "{{baseUrl}}/calls/upload-recording",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "recording", "type": "file", "src": "", "description": "audio file: mp3/m4a/aac/amr/wav/ogg/opus/webm/3gp/flac (<=50MB)" },
+                { "key": "lead_id", "value": "1", "type": "text" },
+                { "key": "to_number", "value": "9876543210", "type": "text", "description": "required if no lead_id" },
+                { "key": "from_number", "value": "", "type": "text", "description": "defaults to the agent phone/extension" },
+                { "key": "direction", "value": "outbound", "type": "text", "description": "outbound | inbound" },
+                { "key": "status", "value": "completed", "type": "text" },
+                { "key": "duration_seconds", "value": "92", "type": "text" },
+                { "key": "talk_time_seconds", "value": "80", "type": "text" },
+                { "key": "started_at", "value": "2026-06-09T10:00:00.000Z", "type": "text" },
+                { "key": "ended_at", "value": "2026-06-09T10:01:32.000Z", "type": "text" },
+                { "key": "is_missed", "value": "false", "type": "text" },
+                { "key": "client_call_id", "value": "device-uuid-1234", "type": "text", "description": "client id; makes the upload idempotent" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Click to call (provider only)",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "description": "Only works when a cloud telephony provider is configured.",
             "url": "{{baseUrl}}/calls/click-to-call",
             "body": { "mode": "raw", "raw": "{\n  \"lead_id\": 1\n}" }
           }
         },
-        { "name": "List", "request": { "method": "GET", "url": "{{baseUrl}}/calls" } }
+        { "name": "Get", "request": { "method": "GET", "url": "{{baseUrl}}/calls/1" } },
+        {
+          "name": "Recording URL",
+          "request": {
+            "method": "GET",
+            "description": "Returns { data: { url } } — a 15-min presigned S3 URL or the local stream route. 404 until the recording is archived.",
+            "url": "{{baseUrl}}/calls/1/recording-url"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Follow-ups",
+      "item": [
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/followups?view=list&status=",
+              "host": ["{{baseUrl}}"],
+              "path": ["followups"],
+              "query": [
+                { "key": "view", "value": "list", "description": "list | kanban" },
+                { "key": "status", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/followups",
+            "body": { "mode": "raw", "raw": "{\n  \"lead_id\": 1,\n  \"title\": \"Call back about hostel fees\",\n  \"scheduled_at\": \"2026-06-10T09:00:00.000Z\",\n  \"channel\": \"call\"\n}" }
+          }
+        },
+        {
+          "name": "Complete",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/followups/1",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"completed\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/notifications?unread=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [{ "key": "unread", "value": "true" }]
+            }
+          }
+        },
+        { "name": "Mark read", "request": { "method": "POST", "url": "{{baseUrl}}/notifications/1/read" } },
+        { "name": "Mark all read", "request": { "method": "POST", "url": "{{baseUrl}}/notifications/read-all" } }
       ]
     },
     {
       "name": "Reports",
       "item": [
-        { "name": "Lead source", "request": { "method": "GET", "url": "{{baseUrl}}/reports/lead-source" } }
+        { "name": "Lead source", "request": { "method": "GET", "url": "{{baseUrl}}/reports/lead-source" } },
+        { "name": "Counselor performance", "request": { "method": "GET", "url": "{{baseUrl}}/reports/counselor-performance" } },
+        {
+          "name": "Export (CSV)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/lead-source/export?format=csv",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "lead-source", "export"],
+              "query": [{ "key": "format", "value": "csv", "description": "csv | excel" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        { "name": "Get", "request": { "method": "GET", "url": "{{baseUrl}}/profile" } },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/profile",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Admin User\",\n  \"phone\": \"9999999999\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Telephony (public webhook)",
+      "item": [
+        {
+          "name": "Provider status callback",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "description": "Public, signature-verified. Only used when a cloud provider is configured.",
+            "url": "{{baseUrl}}/telephony/webhook/exotel",
+            "body": { "mode": "raw", "raw": "{\n  \"CallSid\": \"abc123\",\n  \"Status\": \"completed\"\n}" }
+          }
+        }
       ]
     }
   ]
