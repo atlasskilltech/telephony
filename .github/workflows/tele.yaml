@@ -25,5 +25,5 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             npm ci --only=production
-            pm2 restart telephony || pm2 start server.js --name telephony
+            pm2 restart telephony || pm2 start src/app.js --name telephony
             pm2 save
