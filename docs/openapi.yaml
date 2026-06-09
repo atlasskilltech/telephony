@@ -1,0 +1,160 @@
+openapi: 3.0.3
+info:
+  title: Admission CRM & Cloud Telephony API
+  version: 1.0.0
+  description: >-
+    REST API for the AI-Powered Admission CRM. JWT bearer auth; rotating refresh
+    tokens. Import into Swagger UI or Postman.
+servers:
+  - url: '{baseUrl}/api/v1'
+    variables:
+      baseUrl:
+        default: http://localhost:3000
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: {}
+        meta: { type: object }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+        device_name: { type: string }
+    LeadCreate:
+      type: object
+      required: [first_name, phone]
+      properties:
+        first_name: { type: string }
+        last_name: { type: string }
+        phone: { type: string }
+        email: { type: string, format: email }
+        course: { type: string }
+        city: { type: string }
+        source_id: { type: integer }
+        priority: { type: string, enum: [low, medium, high, hot] }
+        auto_assign: { type: boolean }
+        strategy: { type: string, enum: [round_robin, course_wise, city_wise, team_wise, manual] }
+    ClickToCall:
+      type: object
+      properties:
+        lead_id: { type: integer }
+        to_number: { type: string }
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses: { '200': { description: OK } }
+  /auth/login:
+    post:
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: Tokens + user }
+        '401': { description: Invalid credentials }
+        '422': { description: Validation error }
+  /auth/refresh:
+    post:
+      summary: Rotate refresh token
+      security: []
+      responses: { '200': { description: New token pair } }
+  /auth/me:
+    get:
+      summary: Current user + permissions
+      responses: { '200': { description: User } }
+  /dashboard:
+    get:
+      summary: Dashboard overview (stats, funnel, trend)
+      responses: { '200': { description: Overview } }
+  /leads:
+    get:
+      summary: List leads
+      parameters:
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: pipeline_stage, in: query, schema: { type: string } }
+        - { name: course, in: query, schema: { type: string } }
+        - { name: city, in: query, schema: { type: string } }
+      responses: { '200': { description: Paginated leads } }
+    post:
+      summary: Create lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadCreate' }
+      responses: { '201': { description: Created } }
+  /leads/{id}:
+    get:
+      summary: Get lead
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Lead }, '404': { description: Not found } }
+    put:
+      summary: Update lead
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Updated } }
+    delete:
+      summary: Delete lead
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Deleted } }
+  /leads/{id}/assign:
+    post:
+      summary: Assign lead
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Assigned } }
+  /leads/import/preview:
+    post:
+      summary: Preview an Excel/CSV import (column mapping + validation)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties: { file: { type: string, format: binary } }
+      responses: { '200': { description: Preview } }
+  /calls/click-to-call:
+    post:
+      summary: Initiate a click-to-call
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClickToCall' }
+      responses: { '201': { description: Call initiated } }
+  /calls/{id}:
+    get:
+      summary: Get a call with recording, transcript and AI analysis
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: Call } }
+  /followups:
+    get: { summary: List follow-ups, responses: { '200': { description: OK } } }
+    post: { summary: Create follow-up, responses: { '201': { description: Created } } }
+  /reports/{type}:
+    get:
+      summary: Get a report
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string, enum: [counselor-performance, lead-source, course, admission-funnel] }
+      responses: { '200': { description: Report } }
+  /notifications:
+    get: { summary: List notifications, responses: { '200': { description: OK } } }

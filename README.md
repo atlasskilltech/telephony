@@ -1,0 +1,186 @@
+# AI-Powered Admission CRM & Cloud Telephony System
+
+A production-grade admission management platform for university admission teams:
+lead ingestion (Excel/CSV/API/website/Facebook), automatic counselor assignment,
+cloud telephony (click-to-call + recording), AI transcription & call analysis
+(Whisper + GPT), a real-time web dashboard and a versioned mobile REST API.
+
+> **Status:** This repository contains a fully wired, runnable backend + web
+> dashboard foundation. Every module in the architecture is implemented with
+> real (non-placeholder) code following a clean **repository → service →
+> controller** layering. See [Implementation status](#implementation-status)
+> for exactly what is built end-to-end vs. stubbed for external providers.
+
+---
+
+## Tech stack
+
+| Layer        | Technology |
+|--------------|-----------|
+| Runtime      | Node.js 22 LTS, Express.js |
+| Database     | MySQL 8 + Sequelize ORM (migrations & seeders) |
+| Cache/Queue  | Redis + BullMQ |
+| Realtime     | Socket.IO |
+| Auth         | JWT access + rotating refresh tokens, RBAC |
+| Frontend     | EJS + Tailwind CSS + Alpine.js + Chart.js |
+| AI           | OpenAI Whisper (transcription) + GPT (analysis/QA) |
+| Storage      | AWS S3 with local-disk fallback |
+| Telephony    | Exotel adapter (+ pluggable Knowlarity/MyOperator/Ozonetel) |
+| DevOps       | Docker, Docker Compose, Nginx, PM2, GitHub Actions |
+
+---
+
+## Architecture
+
+```
+src/
+├── config/          App config, Sequelize, Redis connections
+├── models/          25 Sequelize models + associations (auto-loaded)
+├── migrations/      Full schema migration
+├── seeders/         Roles, permission matrix, statuses, sources, super admin
+├── middlewares/     auth, RBAC, rate-limit, validation, audit, errors
+├── repositories/    Data-access layer (repository pattern)
+├── services/        Business logic (auth, leads, telephony, AI, reports…)
+│   └── telephony/   Provider abstraction (BaseProvider + Exotel)
+├── controllers/     HTTP handlers (thin)
+├── routes/
+│   ├── api/v1/       Versioned mobile/web REST API
+│   └── web/          Server-rendered dashboard routes
+├── queues/          BullMQ producers, worker process, job processors, scheduler
+├── sockets/         JWT-authenticated Socket.IO server
+├── utils/           logger, ApiError, token, constants, helpers
+├── app.js           Express app (security, parsing, routing)
+└── server.js        HTTP + Socket.IO bootstrap
+views/               EJS pages, layouts, partials (Tailwind UI)
+public/              Client JS (API client, Alpine components, charts)
+```
+
+The **call AI pipeline** is fully event-driven:
+
+```
+Telephony webhook ──▶ CallLog updated ──▶ CallRecording created
+        │
+        └─▶ transcription queue ─▶ download + archive to S3/local
+                                  ─▶ Whisper transcript saved
+                                  ─▶ analysis queue ─▶ GPT analysis + QA scorecard
+                                                     ─▶ AI scores rolled up onto the Lead
+```
+
+---
+
+## Quick start (local)
+
+### Prerequisites
+- Node.js ≥ 20 (22 recommended), MySQL 8, Redis 7
+
+```bash
+# 1. Install
+npm install
+
+# 2. Configure
+cp .env.example .env        # then edit DB/Redis/secrets
+
+# 3. Create the database (once)
+mysql -u root -p -e "CREATE DATABASE admission_crm CHARACTER SET utf8mb4;"
+
+# 4. Migrate + seed
+npm run db:migrate
+npm run db:seed
+
+# 5. Run (two terminals)
+npm run dev                 # web + API on http://localhost:3000
+npm run worker:dev          # BullMQ worker (AI/email/whatsapp jobs)
+```
+
+**Default login:** `admin@admissioncrm.local` / `Admin@12345`
+
+### With Docker
+
+```bash
+cp .env.example .env
+docker compose up --build           # mysql, redis, web, worker, nginx
+# App: http://localhost (via nginx) or http://localhost:3000 (direct)
+```
+The `web` container runs migrations + seeds automatically on first boot.
+
+---
+
+## Configuration
+
+All configuration is environment-driven (see `.env.example`). Key groups:
+`DB_*`, `REDIS_*`, `JWT_*`, `OPENAI_*`, `STORAGE_*` (`local`/`s3`),
+`TELEPHONY_*` (provider + Exotel keys), `SMTP_*`, `WHATSAPP_*`.
+
+- **AI:** Without `OPENAI_API_KEY` the AI service runs in deterministic **stub
+  mode** so the full pipeline stays runnable in dev.
+- **Storage:** `STORAGE_DRIVER=local` writes recordings under `./storage`;
+  set `s3` + AWS creds for production.
+
+---
+
+## User roles & RBAC
+
+Six roles seeded with a granular `module.action` permission matrix
+(`leads.create`, `calls.recording.view`, `reports.export`, …):
+**Super Admin, Admission Manager, Team Leader, Counselor, QA, Management**.
+Permissions are role-derived with optional per-user allow/deny overrides.
+Counselors are automatically scoped to only their own leads/calls.
+
+---
+
+## Documentation
+
+- [`docs/DATABASE.md`](docs/DATABASE.md) — schema & ER overview
+- [`docs/API.md`](docs/API.md) — REST endpoint reference
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — VM (PM2) & Docker deployment
+- [`docs/openapi.yaml`](docs/openapi.yaml) — OpenAPI 3 spec (import into Swagger UI)
+- [`docs/postman_collection.json`](docs/postman_collection.json) — Postman collection
+
+---
+
+## Testing
+
+```bash
+npm test                # unit + API smoke tests (jest + supertest)
+npm run test:coverage
+```
+CI (GitHub Actions) spins up MySQL + Redis, runs migrations and the test suite,
+and builds the Docker image on `main`.
+
+---
+
+## Implementation status
+
+**Fully implemented end-to-end**
+- Auth: login/logout, JWT + rotating refresh tokens, device/session tracking,
+  change/forgot/reset password, RBAC middleware
+- Database: 25-table schema, models, associations, migration, seeders
+- Leads: CRUD, student de-duplication, scoped listing & filters, timeline/notes,
+  duplicate merge, Excel/CSV import (preview → column mapping → commit + report)
+- Assignment engine: round-robin (Redis cursor), course/city/team-wise,
+  least-loaded balancing, manual
+- Telephony: provider abstraction, Exotel click-to-call, webhook ingestion,
+  recording capture
+- AI pipeline: BullMQ transcription (Whisper) → analysis (GPT) → QA scorecard,
+  rolled up onto leads
+- Recordings: S3/local archival with date-partitioned keys + signed URLs/streaming
+- Follow-ups: CRUD, recurrence, overdue scheduler, list/kanban views
+- Dashboard & reports: counselor KPIs, funnel, call trend, exportable reports (CSV/Excel)
+- Realtime: Socket.IO notifications (new lead, missed call, follow-up due)
+- Web UI: responsive Tailwind dashboard with dark mode, leads table, Kanban
+  pipeline, calls + recording player, follow-ups, reports
+- Security: Helmet, CORS, Redis rate limiting, validation, audit logging, soft deletes
+- DevOps: Docker (multi-stage), Compose, Nginx, PM2, CI
+
+**Stubbed / integration points** (logged + DB-tracked, swap in provider creds)
+- Email (SMTP/nodemailer) and WhatsApp Business API senders run in stub mode
+  without credentials
+- Knowlarity/MyOperator/Ozonetel telephony adapters follow the Exotel reference
+  and can be added to the provider registry
+- Whisper speaker diarisation uses a segment-order heuristic
+
+---
+
+## License
+
+UNLICENSED — internal university project.

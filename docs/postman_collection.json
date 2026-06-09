@@ -1,0 +1,106 @@
+{
+  "info": {
+    "name": "Admission CRM & Telephony API",
+    "description": "Mobile/web REST API. Set {{baseUrl}} and run Login first; the access/refresh tokens are saved to collection variables automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data) {",
+                  "  pm.collectionVariables.set('accessToken', j.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', j.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@admissioncrm.local\",\n  \"password\": \"Admin@12345\",\n  \"device_name\": \"Postman\"\n}"
+            }
+          }
+        },
+        { "name": "Me", "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" } },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        { "name": "Overview", "request": { "method": "GET", "url": "{{baseUrl}}/dashboard" } }
+      ]
+    },
+    {
+      "name": "Leads",
+      "item": [
+        { "name": "List", "request": { "method": "GET", "url": "{{baseUrl}}/leads?page=1&limit=20" } },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/leads",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Asha\",\n  \"phone\": \"9876543210\",\n  \"email\": \"asha@example.com\",\n  \"course\": \"B.Tech CSE\",\n  \"city\": \"Mumbai\"\n}"
+            }
+          }
+        },
+        { "name": "Get", "request": { "method": "GET", "url": "{{baseUrl}}/leads/1" } },
+        { "name": "Timeline", "request": { "method": "GET", "url": "{{baseUrl}}/leads/1/timeline" } }
+      ]
+    },
+    {
+      "name": "Calls",
+      "item": [
+        {
+          "name": "Click to call",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/calls/click-to-call",
+            "body": { "mode": "raw", "raw": "{\n  \"lead_id\": 1\n}" }
+          }
+        },
+        { "name": "List", "request": { "method": "GET", "url": "{{baseUrl}}/calls" } }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        { "name": "Lead source", "request": { "method": "GET", "url": "{{baseUrl}}/reports/lead-source" } }
+      ]
+    }
+  ]
+}
