@@ -23,7 +23,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'Notification',
-      tableName: 'notifications',
+      tableName: 'telephony_notifications',
       paranoid: false,
       indexes: [{ fields: ['user_id', 'read_at'] }, { fields: ['type'] }],
     }

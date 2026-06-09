@@ -20,10 +20,10 @@ module.exports = {
       { name: 'QA Team', slug: ROLES.QA, description: 'Audit recordings' },
       { name: 'Management', slug: ROLES.MANAGEMENT, description: 'View analytics and KPIs' },
     ].map((r) => ({ ...r, is_system: true, created_at: now, updated_at: now }));
-    await queryInterface.bulkInsert('roles', roles);
+    await queryInterface.bulkInsert('telephony_roles', roles);
 
     const roleRows = await queryInterface.sequelize.query(
-      'SELECT id, slug FROM roles',
+      'SELECT id, slug FROM telephony_roles',
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
     const roleId = Object.fromEntries(roleRows.map((r) => [r.slug, r.id]));
@@ -53,10 +53,10 @@ module.exports = {
         });
       }
     }
-    await queryInterface.bulkInsert('permissions', permissions);
+    await queryInterface.bulkInsert('telephony_permissions', permissions);
 
     const permRows = await queryInterface.sequelize.query(
-      'SELECT id, slug, module FROM permissions',
+      'SELECT id, slug, module FROM telephony_permissions',
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
 
@@ -95,11 +95,11 @@ module.exports = {
         p.slug.endsWith('.view') || p.module === 'reports' || p.module === 'ai'
       )
     );
-    await queryInterface.bulkInsert('role_permissions', rolePerms);
+    await queryInterface.bulkInsert('telephony_role_permissions', rolePerms);
 
     // ---- Super admin user ----
     const password = await bcrypt.hash('Admin@12345', 12);
-    await queryInterface.bulkInsert('users', [
+    await queryInterface.bulkInsert('telephony_users', [
       {
         uuid: require('crypto').randomUUID(),
         name: 'Super Admin',
@@ -137,7 +137,7 @@ module.exports = {
       created_at: now,
       updated_at: now,
     }));
-    await queryInterface.bulkInsert('lead_statuses', statuses);
+    await queryInterface.bulkInsert('telephony_lead_statuses', statuses);
 
     // ---- Lead sources ----
     const sources = [
@@ -148,16 +148,16 @@ module.exports = {
       { name: 'API', slug: 'api', channel: 'api' },
       { name: 'Walk In', slug: 'walk_in', channel: 'manual' },
     ].map((s) => ({ ...s, is_active: true, created_at: now, updated_at: now }));
-    await queryInterface.bulkInsert('lead_sources', sources);
+    await queryInterface.bulkInsert('telephony_lead_sources', sources);
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete('role_permissions', null, {});
-    await queryInterface.bulkDelete('user_permissions', null, {});
-    await queryInterface.bulkDelete('users', null, {});
-    await queryInterface.bulkDelete('permissions', null, {});
-    await queryInterface.bulkDelete('lead_sources', null, {});
-    await queryInterface.bulkDelete('lead_statuses', null, {});
-    await queryInterface.bulkDelete('roles', null, {});
+    await queryInterface.bulkDelete('telephony_role_permissions', null, {});
+    await queryInterface.bulkDelete('telephony_user_permissions', null, {});
+    await queryInterface.bulkDelete('telephony_users', null, {});
+    await queryInterface.bulkDelete('telephony_permissions', null, {});
+    await queryInterface.bulkDelete('telephony_lead_sources', null, {});
+    await queryInterface.bulkDelete('telephony_lead_statuses', null, {});
+    await queryInterface.bulkDelete('telephony_roles', null, {});
   },
 };

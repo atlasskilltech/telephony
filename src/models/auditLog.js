@@ -26,7 +26,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'AuditLog',
-      tableName: 'audit_logs',
+      tableName: 'telephony_audit_logs',
       paranoid: false,
       updatedAt: false,
       indexes: [{ fields: ['user_id'] }, { fields: ['action'] }, { fields: ['entity', 'entity_id'] }],

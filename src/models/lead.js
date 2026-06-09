@@ -46,7 +46,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'Lead',
-      tableName: 'leads',
+      tableName: 'telephony_leads',
       indexes: [
         { fields: ['assigned_to'] },
         { fields: ['status_id'] },

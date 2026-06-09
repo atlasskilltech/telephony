@@ -19,7 +19,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'UserPermission',
-      tableName: 'user_permissions',
+      tableName: 'telephony_user_permissions',
       paranoid: false,
       indexes: [{ unique: true, fields: ['user_id', 'permission_id'] }],
     }

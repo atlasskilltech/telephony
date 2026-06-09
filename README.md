@@ -26,7 +26,7 @@ cloud telephony (click-to-call + recording), AI transcription & call analysis
 | AI           | OpenAI Whisper (transcription) + GPT (analysis/QA) |
 | Storage      | AWS S3 with local-disk fallback |
 | Telephony    | Exotel adapter (+ pluggable Knowlarity/MyOperator/Ozonetel) |
-| DevOps       | Docker, Docker Compose, Nginx, PM2, GitHub Actions |
+| DevOps       | Nginx, PM2, GitHub Actions |
 
 ---
 
@@ -94,14 +94,8 @@ npm run worker:dev          # BullMQ worker (AI/email/whatsapp jobs)
 
 **Default login:** `admin@admissioncrm.local` / `Admin@12345`
 
-### With Docker
-
-```bash
-cp .env.example .env
-docker compose up --build           # mysql, redis, web, worker, nginx
-# App: http://localhost (via nginx) or http://localhost:3000 (direct)
-```
-The `web` container runs migrations + seeds automatically on first boot.
+> Production deployment runs the app under **PM2** behind **Nginx** (no Docker).
+> See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) and [`deploy/nginx.conf`](deploy/nginx.conf).
 
 ---
 
@@ -132,7 +126,7 @@ Counselors are automatically scoped to only their own leads/calls.
 
 - [`docs/DATABASE.md`](docs/DATABASE.md) — schema & ER overview
 - [`docs/API.md`](docs/API.md) — REST endpoint reference
-- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — VM (PM2) & Docker deployment
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — VM deployment (PM2 + Nginx)
 - [`docs/openapi.yaml`](docs/openapi.yaml) — OpenAPI 3 spec (import into Swagger UI)
 - [`docs/postman_collection.json`](docs/postman_collection.json) — Postman collection
 
@@ -144,8 +138,7 @@ Counselors are automatically scoped to only their own leads/calls.
 npm test                # unit + API smoke tests (jest + supertest)
 npm run test:coverage
 ```
-CI (GitHub Actions) spins up MySQL + Redis, runs migrations and the test suite,
-and builds the Docker image on `main`.
+CI (GitHub Actions) spins up MySQL + Redis, runs migrations and the test suite.
 
 ---
 
@@ -170,7 +163,7 @@ and builds the Docker image on `main`.
 - Web UI: responsive Tailwind dashboard with dark mode, leads table, Kanban
   pipeline, calls + recording player, follow-ups, reports
 - Security: Helmet, CORS, Redis rate limiting, validation, audit logging, soft deletes
-- DevOps: Docker (multi-stage), Compose, Nginx, PM2, CI
+- DevOps: Nginx reverse-proxy config, PM2 (cluster web + worker), GitHub Actions CI
 
 **Stubbed / integration points** (logged + DB-tracked, swap in provider creds)
 - Email (SMTP/nodemailer) and WhatsApp Business API senders run in stub mode

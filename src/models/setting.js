@@ -23,7 +23,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'Setting',
-      tableName: 'settings',
+      tableName: 'telephony_settings',
       paranoid: false,
       indexes: [{ unique: true, fields: ['user_id', 'key'] }],
     }

@@ -6,7 +6,7 @@ module.exports = (sequelize) => {
   class Permission extends Model {
     static associate(models) {
       Permission.belongsToMany(models.Role, {
-        through: 'role_permissions',
+        through: 'telephony_role_permissions',
         foreignKey: 'permission_id',
         otherKey: 'role_id',
         as: 'roles',
@@ -29,7 +29,7 @@ module.exports = (sequelize) => {
       module: { type: DataTypes.STRING(60), allowNull: true },
       description: { type: DataTypes.STRING(255), allowNull: true },
     },
-    { sequelize, modelName: 'Permission', tableName: 'permissions' }
+    { sequelize, modelName: 'Permission', tableName: 'telephony_permissions' }
   );
 
   return Permission;

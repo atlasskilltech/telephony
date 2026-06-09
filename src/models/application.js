@@ -30,7 +30,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'Application',
-      tableName: 'applications',
+      tableName: 'telephony_applications',
       indexes: [{ fields: ['lead_id'] }, { fields: ['student_id'] }, { fields: ['status'] }],
     }
   );

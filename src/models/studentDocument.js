@@ -26,7 +26,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'StudentDocument',
-      tableName: 'student_documents',
+      tableName: 'telephony_student_documents',
       indexes: [{ fields: ['student_id'] }],
     }
   );

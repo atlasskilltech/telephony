@@ -31,7 +31,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'EmailLog',
-      tableName: 'email_logs',
+      tableName: 'telephony_email_logs',
       paranoid: false,
       indexes: [{ fields: ['lead_id'] }, { fields: ['status'] }],
     }

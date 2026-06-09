@@ -21,7 +21,7 @@ module.exports = (sequelize) => {
       is_won: { type: DataTypes.BOOLEAN, defaultValue: false },
       is_lost: { type: DataTypes.BOOLEAN, defaultValue: false },
     },
-    { sequelize, modelName: 'LeadStatus', tableName: 'lead_statuses' }
+    { sequelize, modelName: 'LeadStatus', tableName: 'telephony_lead_statuses' }
   );
 
   return LeadStatus;

@@ -29,7 +29,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'RefreshToken',
-      tableName: 'refresh_tokens',
+      tableName: 'telephony_refresh_tokens',
       paranoid: false,
       indexes: [{ fields: ['user_id'] }, { fields: ['token_hash'] }],
     }

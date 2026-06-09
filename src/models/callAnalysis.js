@@ -42,7 +42,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'CallAnalysis',
-      tableName: 'call_analysis',
+      tableName: 'telephony_call_analysis',
       indexes: [{ fields: ['call_id'] }, { fields: ['sentiment'] }, { fields: ['status'] }],
     }
   );

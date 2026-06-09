@@ -62,7 +62,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'User',
-      tableName: 'users',
+      tableName: 'telephony_users',
       indexes: [
         { fields: ['role_id'] },
         { fields: ['team_leader_id'] },

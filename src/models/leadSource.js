@@ -18,7 +18,7 @@ module.exports = (sequelize) => {
       channel: { type: DataTypes.STRING(40), allowNull: true },
       is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
     },
-    { sequelize, modelName: 'LeadSource', tableName: 'lead_sources' }
+    { sequelize, modelName: 'LeadSource', tableName: 'telephony_lead_sources' }
   );
 
   return LeadSource;

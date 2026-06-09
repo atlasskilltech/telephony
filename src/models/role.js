@@ -7,7 +7,7 @@ module.exports = (sequelize) => {
     static associate(models) {
       Role.hasMany(models.User, { foreignKey: 'role_id', as: 'users' });
       Role.belongsToMany(models.Permission, {
-        through: 'role_permissions',
+        through: 'telephony_role_permissions',
         foreignKey: 'role_id',
         otherKey: 'permission_id',
         as: 'permissions',
@@ -23,7 +23,7 @@ module.exports = (sequelize) => {
       description: { type: DataTypes.STRING(255), allowNull: true },
       is_system: { type: DataTypes.BOOLEAN, defaultValue: false },
     },
-    { sequelize, modelName: 'Role', tableName: 'roles' }
+    { sequelize, modelName: 'Role', tableName: 'telephony_roles' }
   );
 
   return Role;

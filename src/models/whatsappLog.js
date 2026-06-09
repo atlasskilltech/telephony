@@ -28,7 +28,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'WhatsappLog',
-      tableName: 'whatsapp_logs',
+      tableName: 'telephony_whatsapp_logs',
       paranoid: false,
       indexes: [{ fields: ['lead_id'] }, { fields: ['status'] }],
     }

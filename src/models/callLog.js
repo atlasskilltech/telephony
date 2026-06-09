@@ -38,7 +38,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'CallLog',
-      tableName: 'call_logs',
+      tableName: 'telephony_call_logs',
       indexes: [
         { fields: ['lead_id'] },
         { fields: ['agent_id'] },

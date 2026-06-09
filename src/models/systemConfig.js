@@ -21,7 +21,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'SystemConfig',
-      tableName: 'system_configs',
+      tableName: 'telephony_system_configs',
       paranoid: false,
     }
   );

@@ -26,7 +26,7 @@ module.exports = (sequelize) => {
     {
       sequelize,
       modelName: 'ActivityLog',
-      tableName: 'activity_logs',
+      tableName: 'telephony_activity_logs',
       paranoid: false,
       indexes: [{ fields: ['subject_type', 'subject_id'] }, { fields: ['user_id'] }],
     }
