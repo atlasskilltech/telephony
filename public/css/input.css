@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Production build: `npm run build:css` compiles this to public/css/app.css.
+   The views currently load Tailwind via CDN for zero-build dev convenience;
+   swap the CDN <script> for <link rel="stylesheet" href="/public/css/app.css">
+   in the layouts to use the compiled, purged stylesheet in production. */
+
+[x-cloak] {
+  display: none !important;
+}

@@ -1,0 +1,63 @@
+<div x-data="callsPage()" x-init="init()">
+  <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-left">
+          <tr>
+            <th class="px-4 py-3 font-medium">When</th>
+            <th class="px-4 py-3 font-medium">Lead</th>
+            <th class="px-4 py-3 font-medium">Direction</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-4 py-3 font-medium">Duration</th>
+            <th class="px-4 py-3 font-medium">AI</th>
+            <th class="px-4 py-3 font-medium">Recording</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+          <template x-for="c in calls" :key="c.id">
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <td class="px-4 py-3" x-text="fmt.date(c.started_at)"></td>
+              <td class="px-4 py-3" x-text="c.lead?.student?.first_name || c.to_number"></td>
+              <td class="px-4 py-3 capitalize" x-text="c.direction"></td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 rounded-md text-xs"
+                  :class="c.is_missed ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10'"
+                  x-text="c.status"></span>
+              </td>
+              <td class="px-4 py-3" x-text="fmt.duration(c.talk_time_seconds)"></td>
+              <td class="px-4 py-3">
+                <span x-show="c.analysis" class="text-xs" x-text="c.analysis ? (c.analysis.sentiment + ' · ' + (c.analysis.interest_score||'') + '%') : ''"></span>
+                <span x-show="!c.analysis" class="text-slate-400 text-xs">pending</span>
+              </td>
+              <td class="px-4 py-3">
+                <button x-show="c.recording" @click="play(c)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">▶ Play</button>
+                <span x-show="!c.recording" class="text-slate-400 text-xs">—</span>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="!loading && calls.length===0"><td colspan="7" class="px-4 py-10 text-center text-slate-500">No calls yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <audio x-ref="player" controls class="mt-4 w-full" x-show="audioUrl" :src="audioUrl"></audio>
+</div>
+<script>
+  window.callsPage = function () {
+    return {
+      calls: [], loading: true, audioUrl: '',
+      async init() {
+        const res = await api.get('/api/v1/calls');
+        this.calls = res.data || [];
+        this.loading = false;
+      },
+      async play(c) {
+        try {
+          const res = await api.get(`/api/v1/calls/${c.id}/recording-url`);
+          this.audioUrl = res.data.url;
+          this.$nextTick(() => this.$refs.player.play());
+        } catch (e) { alert(e.message); }
+      },
+    };
+  };
+</script>

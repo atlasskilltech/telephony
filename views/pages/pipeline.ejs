@@ -1,0 +1,47 @@
+<div x-data="pipelinePage()" x-init="init()">
+  <p class="text-sm text-slate-500 mb-4">Drag leads across stages to update the admission pipeline.</p>
+  <div class="flex gap-4 overflow-x-auto pb-4">
+    <template x-for="stage in stages" :key="stage">
+      <div class="w-72 flex-shrink-0">
+        <div class="flex items-center justify-between mb-2 px-1">
+          <h3 class="font-medium text-sm capitalize" x-text="stage.replace(/_/g,' ')"></h3>
+          <span class="text-xs text-slate-500" x-text="(board[stage]||[]).length"></span>
+        </div>
+        <div class="space-y-2 min-h-[120px] p-2 rounded-xl bg-slate-100/60 dark:bg-slate-800/40"
+             @drop="onDrop($event, stage)" @dragover.prevent @dragenter.prevent>
+          <template x-for="lead in (board[stage]||[])" :key="lead.id">
+            <div class="glass rounded-lg border border-slate-200 dark:border-slate-700 p-3 cursor-move"
+                 draggable="true" @dragstart="dragId = lead.id">
+              <p class="font-medium text-sm" x-text="lead.student ? lead.student.first_name : 'Lead'"></p>
+              <p class="text-xs text-slate-500" x-text="lead.course || '—'"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+<script>
+  window.pipelinePage = function () {
+    return {
+      stages: ['new_lead','contacted','interested','qualified','application_started','application_submitted','offer_issued','admission_confirmed','enrollment_completed'],
+      board: {},
+      dragId: null,
+      async init() {
+        const res = await api.get('/api/v1/leads?limit=100');
+        const board = {};
+        this.stages.forEach(s => board[s] = []);
+        (res.data || []).forEach(l => { (board[l.pipeline_stage] || board.new_lead).push(l); });
+        this.board = board;
+      },
+      async onDrop(e, stage) {
+        if (!this.dragId) return;
+        try {
+          await api.put(`/api/v1/leads/${this.dragId}`, { pipeline_stage: stage });
+          await this.init();
+        } catch (err) { alert(err.message); }
+        this.dragId = null;
+      },
+    };
+  };
+</script>

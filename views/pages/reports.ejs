@@ -1,0 +1,68 @@
+<div x-data="reportsPage()" x-init="init()">
+  <div class="flex flex-wrap items-center gap-2 mb-4">
+    <template x-for="r in reports" :key="r.type">
+      <button @click="select(r.type)" class="px-3 py-1.5 rounded-lg text-sm"
+        :class="active===r.type ? 'bg-indigo-600 text-white' : 'border border-slate-200 dark:border-slate-700'" x-text="r.label"></button>
+    </template>
+    <div class="ml-auto flex gap-2">
+      <a :href="`/api/v1/reports/${active}/export?format=csv`" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm">Export CSV</a>
+      <a :href="`/api/v1/reports/${active}/export?format=excel`" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm">Export Excel</a>
+    </div>
+  </div>
+
+  <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+    <canvas id="reportChart" height="100"></canvas>
+    <div class="overflow-x-auto mt-6">
+      <table class="w-full text-sm">
+        <thead class="text-slate-500 text-left">
+          <tr><template x-for="h in headers" :key="h"><th class="px-3 py-2 font-medium capitalize" x-text="h.replace(/_/g,' ')"></th></template></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+          <template x-for="(row,i) in rows" :key="i">
+            <tr><template x-for="h in headers" :key="h"><td class="px-3 py-2" x-text="typeof row[h]==='object' ? JSON.stringify(row[h]) : row[h]"></td></template></tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+  window.reportsPage = function () {
+    return {
+      reports: [
+        { type: 'counselor-performance', label: 'Counselor' },
+        { type: 'lead-source', label: 'Lead Source' },
+        { type: 'course', label: 'Course' },
+        { type: 'admission-funnel', label: 'Funnel' },
+      ],
+      active: 'lead-source', rows: [], headers: [], chart: null,
+      async init() { await this.select('lead-source'); },
+      async select(type) {
+        this.active = type;
+        const res = await api.get(`/api/v1/reports/${type}`);
+        const data = res.data || [];
+        this.rows = data.map(r => this.flatten(r));
+        this.headers = this.rows.length ? Object.keys(this.rows[0]) : [];
+        this.draw(data);
+      },
+      flatten(o, p='') {
+        const out = {};
+        Object.entries(o).forEach(([k,v]) => {
+          if (v && typeof v==='object' && !Array.isArray(v)) Object.assign(out, this.flatten(v, k+'_'));
+          else out[p+k] = Array.isArray(v) ? v.join('; ') : v;
+        });
+        return out;
+      },
+      draw(data) {
+        const labelKey = Object.keys(this.flatten(data[0]||{}))[0];
+        const valKey = this.headers.find(h => typeof (this.rows[0]||{})[h] === 'number') || this.headers[1];
+        if (this.chart) this.chart.destroy();
+        this.chart = new Chart(document.getElementById('reportChart'), {
+          type: 'bar',
+          data: { labels: this.rows.map(r => r[labelKey]), datasets: [{ data: this.rows.map(r => r[valKey]), backgroundColor: '#6366f1', borderRadius: 6 }] },
+          options: { plugins: { legend: { display: false } } },
+        });
+      },
+    };
+  };
+</script>

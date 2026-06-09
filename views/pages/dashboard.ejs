@@ -1,0 +1,37 @@
+<div x-data="dashboardPage()" x-init="init()">
+  <!-- KPI cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <% const cards = [
+      { key: 'todaysLeads', label: "Today's Leads", color: 'from-indigo-500 to-blue-500' },
+      { key: 'todaysCalls', label: "Today's Calls", color: 'from-purple-500 to-fuchsia-500' },
+      { key: 'connectedCalls', label: 'Connected', color: 'from-emerald-500 to-teal-500' },
+      { key: 'missedCalls', label: 'Missed', color: 'from-rose-500 to-orange-500' },
+      { key: 'followupsDue', label: 'Follow-ups Due', color: 'from-amber-500 to-yellow-500' },
+      { key: 'admissionsClosed', label: 'Admissions', color: 'from-green-500 to-emerald-600' },
+      { key: 'conversionRate', label: 'Conversion %', color: 'from-cyan-500 to-sky-500' },
+      { key: 'talkTimeSeconds', label: 'Talk Time', color: 'from-violet-500 to-indigo-500', fmt: 'duration' },
+    ]; %>
+    <% cards.forEach(function(c){ %>
+      <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-500"><%= c.label %></p>
+          <span class="w-2.5 h-2.5 rounded-full bg-gradient-to-br <%= c.color %>"></span>
+        </div>
+        <p class="text-2xl font-semibold mt-2"
+           x-text="<%= c.fmt === 'duration' ? `fmt.duration(stats.${c.key})` : `stats.${c.key} ?? '—'` %>">—</p>
+      </div>
+    <% }); %>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+      <h3 class="font-medium mb-4">Pipeline Funnel</h3>
+      <canvas id="funnelChart" height="140"></canvas>
+    </div>
+    <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+      <h3 class="font-medium mb-4">Call Activity (14 days)</h3>
+      <canvas id="trendChart" height="140"></canvas>
+    </div>
+  </div>
+</div>

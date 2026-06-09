@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full" :class="dark ? 'dark' : ''" x-data="{ dark: localStorage.getItem('theme') !== 'light' }" x-init="$watch('dark', v => localStorage.setItem('theme', v ? 'dark' : 'light'))">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %> · Admission CRM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.socket.io/4.8.0/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script src="/public/js/app.js" defer></script>
+  <style>
+    body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+    .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(16px); }
+    .dark .glass { background: rgba(15,23,42,0.6); border-color: rgba(255,255,255,0.08); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(100,116,139,.4); border-radius: 8px; }
+  </style>
+</head>
+<body class="h-full bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 transition-colors">
+  <div class="flex h-full">
+    <%- include('../partials/sidebar', { active }) %>
+    <div class="flex-1 flex flex-col min-w-0">
+      <%- include('../partials/header', { user, title }) %>
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <%- body %>
+      </main>
+    </div>
+  </div>
+  <script>
+    window.__USER__ = <%- JSON.stringify({ id: user.id, name: user.name, role: roleSlug }) %>;
+  </script>
+</body>
+</html>

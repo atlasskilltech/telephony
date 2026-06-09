@@ -7,6 +7,15 @@ const logger = require('../utils/logger');
 
 let io = null;
 
+// Minimal cookie header parser for the websocket handshake.
+function parseCookie(header) {
+  return header.split(';').reduce((acc, part) => {
+    const idx = part.indexOf('=');
+    if (idx > -1) acc[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+    return acc;
+  }, {});
+}
+
 /**
  * Attaches a JWT-authenticated Socket.IO server to the HTTP server. Each
  * authenticated user joins a personal room (`user:<id>`) and a role room so
@@ -21,7 +30,8 @@ function initSocket(httpServer) {
     try {
       const token =
         socket.handshake.auth?.token ||
-        (socket.handshake.headers.authorization || '').replace('Bearer ', '');
+        (socket.handshake.headers.authorization || '').replace('Bearer ', '') ||
+        parseCookie(socket.handshake.headers.cookie || '').access_token;
       if (!token) return next(new Error('Authentication required'));
       const decoded = verifyAccessToken(token);
       socket.userId = decoded.sub;

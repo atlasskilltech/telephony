@@ -1,0 +1,37 @@
+<div class="min-h-screen flex items-center justify-center relative overflow-hidden">
+  <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-950 to-purple-900"></div>
+  <div class="absolute -top-32 -left-32 w-96 h-96 bg-indigo-500/30 rounded-full blur-3xl"></div>
+  <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-purple-500/30 rounded-full blur-3xl"></div>
+
+  <div class="relative glass rounded-2xl shadow-2xl w-full max-w-md p-8 mx-4">
+    <div class="flex items-center gap-3 mb-8">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">A</div>
+      <div>
+        <h1 class="text-xl font-semibold">Admission CRM</h1>
+        <p class="text-xs text-slate-400">AI-Powered Telephony Platform</p>
+      </div>
+    </div>
+
+    <% if (error) { %>
+      <div class="mb-4 px-4 py-3 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200 text-sm"><%= error %></div>
+    <% } %>
+
+    <form method="POST" action="/login" class="space-y-4">
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Email</label>
+        <input name="email" type="email" required value="admin@admissioncrm.local"
+          class="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 outline-none text-slate-100" />
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Password</label>
+        <input name="password" type="password" required placeholder="••••••••"
+          class="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 outline-none text-slate-100" />
+      </div>
+      <button type="submit"
+        class="w-full py-2.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 font-medium text-white transition shadow-lg shadow-indigo-500/30">
+        Sign in
+      </button>
+    </form>
+    <p class="text-xs text-slate-500 mt-6 text-center">Default seed login: admin@admissioncrm.local / Admin@12345</p>
+  </div>
+</div>

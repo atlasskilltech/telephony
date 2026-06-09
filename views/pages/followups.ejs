@@ -1,0 +1,60 @@
+<div x-data="followupsPage()" x-init="init()">
+  <div class="flex items-center gap-2 mb-4">
+    <template x-for="v in ['list','kanban']" :key="v">
+      <button @click="view=v; load()" class="px-3 py-1.5 rounded-lg text-sm capitalize"
+        :class="view===v ? 'bg-indigo-600 text-white' : 'border border-slate-200 dark:border-slate-700'" x-text="v"></button>
+    </template>
+  </div>
+
+  <!-- List view -->
+  <div x-show="view==='list'" class="glass rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+    <template x-for="f in items" :key="f.id">
+      <div class="p-4 flex items-center justify-between gap-4">
+        <div>
+          <p class="font-medium text-sm" x-text="f.title"></p>
+          <p class="text-xs text-slate-500" x-text="(f.lead?.student?.first_name||'') + ' · ' + fmt.date(f.scheduled_at)"></p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-1 rounded-md text-xs"
+            :class="{'bg-amber-50 text-amber-600 dark:bg-amber-500/10': f.status==='pending','bg-rose-50 text-rose-600 dark:bg-rose-500/10': f.status==='overdue','bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10': f.status==='completed'}"
+            x-text="f.status"></span>
+          <button x-show="f.status!=='completed'" @click="complete(f)" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs">Done</button>
+        </div>
+      </div>
+    </template>
+    <div x-show="items.length===0" class="p-10 text-center text-slate-500">No follow-ups</div>
+  </div>
+
+  <!-- Kanban view -->
+  <div x-show="view==='kanban'" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <template x-for="col in ['pending','overdue','completed']" :key="col">
+      <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-3">
+        <h3 class="font-medium text-sm capitalize mb-3" x-text="col"></h3>
+        <div class="space-y-2">
+          <template x-for="f in (board[col]||[])" :key="f.id">
+            <div class="rounded-lg bg-slate-50 dark:bg-slate-800 p-3">
+              <p class="text-sm font-medium" x-text="f.title"></p>
+              <p class="text-xs text-slate-500" x-text="fmt.date(f.scheduled_at)"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+<script>
+  window.followupsPage = function () {
+    return {
+      view: 'list', items: [], board: {},
+      async init() { await this.load(); },
+      async load() {
+        const res = await api.get(`/api/v1/followups?view=${this.view}`);
+        if (this.view === 'kanban') { this.board = res.data; } else { this.items = res.data; }
+      },
+      async complete(f) {
+        await api.put(`/api/v1/followups/${f.id}`, { status: 'completed', completed_at: new Date().toISOString() });
+        await this.load();
+      },
+    };
+  };
+</script>
