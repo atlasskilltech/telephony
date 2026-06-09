@@ -78,6 +78,12 @@ const show = asyncHandler(async (req, res) => {
   return success(res, { data: call });
 });
 
+// Re-queue transcription + analysis for an existing recording (no re-upload).
+const retryTranscription = asyncHandler(async (req, res) => {
+  await telephonyService.retryTranscription(Number(req.params.id));
+  return success(res, { message: 'Transcription re-queued' });
+});
+
 // Time-limited recording URL (presigned for S3 / app route for local).
 const recordingUrl = asyncHandler(async (req, res) => {
   const recording = await db.CallRecording.findOne({ where: { call_id: req.params.id } });
@@ -101,4 +107,13 @@ const webhook = asyncHandler(async (req, res) => {
   return res.status(200).json({ received: true });
 });
 
-module.exports = { clickToCall, uploadRecording, list, show, recordingUrl, streamRecording, webhook };
+module.exports = {
+  clickToCall,
+  uploadRecording,
+  list,
+  show,
+  retryTranscription,
+  recordingUrl,
+  streamRecording,
+  webhook,
+};

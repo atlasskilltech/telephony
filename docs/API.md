@@ -60,6 +60,7 @@ rotate on every use and are revocable server-side.
 | POST | `/calls/click-to-call` | `calls.create` | `lead_id` and/or `to_number` (one required) — only if a cloud provider is configured |
 | GET | `/calls` | `calls.view` | filters `lead_id, status`; paginated. Counselors see only their own calls |
 | GET | `/calls/:id` | `calls.view` | full call incl. `recording`, `transcript`, `analysis`, `lead` |
+| POST | `/calls/:id/retry-transcription` | `calls.create` | re-queue transcription + analysis for the stored recording (no re-upload) |
 | GET | `/calls/:id/recording-url` | `calls.recording.view` | time-limited URL to the archived recording |
 | GET | `/calls/recordings/stream?key=` | `calls.recording.view` | streams a local-storage recording (used when `STORAGE_DRIVER=local`) |
 

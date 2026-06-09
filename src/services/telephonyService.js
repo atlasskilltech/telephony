@@ -168,6 +168,37 @@ class TelephonyService {
   }
 
   /**
+   * Re-run the transcription + analysis pipeline for an existing call without
+   * re-uploading. Used to recover calls whose jobs failed (e.g. an audio
+   * format Whisper couldn't read before the transcode fix).
+   */
+  async retryTranscription(callId) {
+    const recording = await db.CallRecording.findOne({ where: { call_id: callId } });
+    if (!recording) throw ApiError.notFound('No recording found for this call');
+    if (!recording.storage_key && !recording.source_url) {
+      throw ApiError.badRequest('Recording has no stored audio to transcribe');
+    }
+
+    // Reset statuses so the UI reflects reprocessing.
+    await recording.update({ status: recording.storage_key ? 'archived' : 'pending' });
+    await db.CallTranscript.update(
+      { status: 'processing', error: null },
+      { where: { call_id: callId } }
+    );
+    await db.CallAnalysis.update(
+      { status: 'processing', error: null },
+      { where: { call_id: callId } }
+    );
+
+    await transcriptionQueue.add('transcribe', {
+      callId,
+      recordingId: recording.id,
+      sourceUrl: recording.source_url || undefined,
+    });
+    return recording;
+  }
+
+  /**
    * Process a provider status-callback webhook: update the call, store the
    * recording reference and enqueue transcription when the call completes.
    */
