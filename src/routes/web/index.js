@@ -11,6 +11,10 @@ const auth = authenticate({ web: true });
 router.get('/', (req, res) => res.redirect('/dashboard'));
 router.get('/login', webController.loginPage);
 router.post('/login', webController.doLogin);
+// Google OAuth (primary sign-in). Callback registered with Google as
+// {APP_URL}/google/callback.
+router.get('/google', webController.googleStart);
+router.get('/google/callback', webController.googleCallback);
 router.post('/logout', webController.doLogout);
 router.get('/logout', webController.doLogout);
 

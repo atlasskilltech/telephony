@@ -46,6 +46,17 @@ const config = {
     // INLINE_WORKERS=false when running a dedicated worker process at scale.
     inlineWorkers: toBool(process.env.INLINE_WORKERS, true),
   },
+  google: {
+    // Google OAuth (web sign-in). Set these in the environment.
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    callbackUrl:
+      process.env.GOOGLE_CALLBACK_URL ||
+      `${process.env.APP_URL || 'http://localhost:3000'}/google/callback`,
+    // Restrict to a Google Workspace domain (used as the `hd` hint and an
+    // extra server-side guard). Empty string disables the restriction.
+    hostedDomain: process.env.GOOGLE_HOSTED_DOMAIN || 'atlasuniversity.edu.in',
+  },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret',

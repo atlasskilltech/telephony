@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const axios = require('axios');
 const { Op } = require('sequelize');
 const db = require('../models');
 const config = require('../config');
@@ -50,6 +51,91 @@ class AuthService {
     if (!valid) throw ApiError.unauthorized('Invalid email or password');
 
     user.last_login_at = new Date();
+    await user.save();
+
+    const tokens = this.buildTokens(user);
+    await this.persistRefreshToken(user, tokens.refreshToken, ctx);
+    return { user, ...tokens };
+  }
+
+  /** Build the Google OAuth consent URL to redirect the user to. */
+  googleAuthUrl({ state }) {
+    if (!config.google.clientId) throw ApiError.badRequest('Google sign-in is not configured');
+    const params = new URLSearchParams({
+      client_id: config.google.clientId,
+      redirect_uri: config.google.callbackUrl,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'online',
+      include_granted_scopes: 'true',
+      prompt: 'select_account',
+      state,
+    });
+    if (config.google.hostedDomain) params.set('hd', config.google.hostedDomain);
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  /**
+   * Complete the Google OAuth code flow and sign the user in. Existing users
+   * only — the Google email must already match an active account.
+   */
+  async loginWithGoogle(code, ctx = {}) {
+    if (!config.google.clientId || !config.google.clientSecret) {
+      throw ApiError.badRequest('Google sign-in is not configured');
+    }
+
+    // 1. Exchange the authorization code for tokens.
+    let accessToken;
+    try {
+      const tokenRes = await axios.post(
+        'https://oauth2.googleapis.com/token',
+        new URLSearchParams({
+          code,
+          client_id: config.google.clientId,
+          client_secret: config.google.clientSecret,
+          redirect_uri: config.google.callbackUrl,
+          grant_type: 'authorization_code',
+        }).toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 15000 }
+      );
+      accessToken = tokenRes.data.access_token;
+    } catch (e) {
+      throw ApiError.unauthorized('Google authentication failed');
+    }
+    if (!accessToken) throw ApiError.unauthorized('Google authentication failed');
+
+    // 2. Fetch the verified profile.
+    let profile;
+    try {
+      const profileRes = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 15000,
+      });
+      profile = profileRes.data || {};
+    } catch (e) {
+      throw ApiError.unauthorized('Could not read your Google profile');
+    }
+
+    const email = (profile.email || '').toLowerCase().trim();
+    if (!email || profile.email_verified === false) {
+      throw ApiError.unauthorized('Your Google email could not be verified');
+    }
+    if (config.google.hostedDomain && !email.endsWith(`@${config.google.hostedDomain}`)) {
+      throw ApiError.forbidden(`Please sign in with your @${config.google.hostedDomain} account`);
+    }
+
+    // 3. Existing users only — no auto-provisioning.
+    const user = await db.User.scope(null).findOne({
+      where: { email },
+      include: [{ model: db.Role, as: 'role' }],
+    });
+    if (!user) {
+      throw ApiError.unauthorized('No account exists for this Google email. Contact your administrator.');
+    }
+    if (user.status !== 'active') throw ApiError.forbidden('Your account is not active');
+
+    user.last_login_at = new Date();
+    if (!user.avatar_url && profile.picture) user.avatar_url = profile.picture;
     await user.save();
 
     const tokens = this.buildTokens(user);
