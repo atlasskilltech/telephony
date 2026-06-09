@@ -1,0 +1,29 @@
+name: Deploy to EC2 Server of atlasliving (TELEPHONY)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/ubuntu/telephony
+            git fetch origin main
+            git reset --hard origin/main
+            npm ci --only=production
+            pm2 restart telephony || pm2 start server.js --name telephony
+            pm2 save
