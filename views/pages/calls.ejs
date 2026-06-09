@@ -177,6 +177,14 @@
   window.callsPage = function () {
     const num = (v) => (v == null || v === '' ? null : Number(v));
     const scoreColor = (s) => (s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#f43f5e');
+    // JSON columns can come back parsed (array/object) or as a raw JSON string
+    // depending on the DB/driver — coerce defensively before using them.
+    const parse = (v) => {
+      if (typeof v !== 'string') return v;
+      try { return JSON.parse(v); } catch (e) { return null; }
+    };
+    const asArray = (v) => { const p = parse(v); return Array.isArray(p) ? p : []; };
+    const asObj = (v) => { const p = parse(v); return p && typeof p === 'object' && !Array.isArray(p) ? p : {}; };
     const mmss = (sec) => {
       if (sec == null) return '';
       const s = Math.floor(Number(sec) || 0);
@@ -226,21 +234,23 @@
         r.subtitle = [call.direction, call.status, fmt.duration(call.talk_time_seconds || call.duration_seconds)]
           .filter(Boolean).join(' · ');
         // Parameter scores (qa_scores are 0-10 -> show 0-100).
-        r.params = Object.entries(a.qa_scores || {}).map(([k, v]) => ({
+        r.params = Object.entries(asObj(a.qa_scores)).map(([k, v]) => ({
           k: k.replace(/_/g, ' '), v: Math.round((Number(v) || 0) * 10),
         }));
         // Transcript turns from diarised segments, else the raw text.
-        const segs = (call.transcript && call.transcript.segments) || [];
+        const segs = asArray(call.transcript && call.transcript.segments);
         if (segs.length) {
           r.turns = segs.map((s) => ({ who: s.speaker, t: mmss(s.start), txt: s.text }));
         } else if (call.transcript && call.transcript.text) {
           r.turns = [{ who: 'note', t: '', txt: call.transcript.text }];
         }
-        r.arc = Array.isArray(a.sentiment_arc) ? a.sentiment_arc.map(Number) : [];
-        r.positive = a.positive_points || [];
-        r.negative = a.negative_points || a.objections || [];
-        r.improvements = a.improvement_suggestions || [];
-        r.recommendations = a.recommendations || (a.followup_recommendation ? [a.followup_recommendation] : []);
+        r.arc = asArray(a.sentiment_arc).map(Number).filter((n) => !Number.isNaN(n));
+        r.positive = asArray(a.positive_points);
+        const neg = asArray(a.negative_points);
+        r.negative = neg.length ? neg : asArray(a.objections);
+        r.improvements = asArray(a.improvement_suggestions);
+        const recs = asArray(a.recommendations);
+        r.recommendations = recs.length ? recs : (a.followup_recommendation ? [a.followup_recommendation] : []);
         this.report = r;
         this.$nextTick(() => this.drawArc());
       },
