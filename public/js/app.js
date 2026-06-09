@@ -85,11 +85,13 @@ window.notifBell = function notifBell() {
 
 // ---- Call analysis dashboard component ----
 window.dashboardPage = function dashboardPage() {
+  // Keep Chart instances OUT of Alpine's reactive state — proxying a Chart (and
+  // its canvas) breaks Chart.js internals ("Cannot read ... 'ownerDocument'").
+  let charts = {};
   return {
     d: {},
     loading: true,
     metricCards: [],
-    _charts: {},
     scoreColor(s) { return s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#f43f5e'; },
     scoreBg(s) { return s >= 80 ? 'rgba(16,185,129,.12)' : s >= 60 ? 'rgba(245,158,11,.12)' : 'rgba(244,63,94,.12)'; },
     async init() {
@@ -115,10 +117,16 @@ window.dashboardPage = function dashboardPage() {
     },
     renderCharts() {
       if (!window.Chart) { setTimeout(() => this.renderCharts(), 80); return; }
-      Object.values(this._charts).forEach((c) => c && c.destroy());
+      Object.values(charts).forEach((c) => c && c.destroy());
+      charts = {};
+      const mk = (ref, cfg) => {
+        const el = this.$refs[ref];
+        if (!el) return;
+        try { charts[ref] = new Chart(el, cfg); } catch (e) { console.error('chart', ref, e); }
+      };
 
       const t = this.d.scoreTrend || [];
-      this._charts.trend = new Chart(this.$refs.trend.getContext('2d'), {
+      mk('trend', {
         data: {
           labels: t.map((x) => x.label),
           datasets: [
@@ -134,14 +142,14 @@ window.dashboardPage = function dashboardPage() {
       });
 
       const s = (this.d.sentimentSplit && this.d.sentimentSplit.percent) || { positive: 0, neutral: 0, negative: 0 };
-      this._charts.sent = new Chart(this.$refs.sent.getContext('2d'), {
+      mk('sent', {
         type: 'doughnut',
         data: { labels: ['Positive', 'Neutral', 'Negative'], datasets: [{ data: [s.positive, s.neutral, s.negative], backgroundColor: ['#10b981', '#888780', '#f43f5e'], borderWidth: 0 }] },
         options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false } } },
       });
 
       const q = this.d.qaRadar || [];
-      this._charts.radar = new Chart(this.$refs.radar.getContext('2d'), {
+      mk('radar', {
         type: 'radar',
         data: { labels: q.map((x) => x.label), datasets: [{ label: 'Team avg', data: q.map((x) => x.value), borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.18)', pointRadius: 2, pointBackgroundColor: '#378ADD' }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { r: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 9 } }, pointLabels: { font: { size: 11 } } } } },

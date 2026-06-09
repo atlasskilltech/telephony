@@ -197,6 +197,8 @@
       const s = Math.floor(Number(sec) || 0);
       return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
     };
+    // Held outside reactive state — proxying a Chart breaks Chart.js internals.
+    let arcChart = null;
     const blankReport = () => ({
       open: false, loading: false, hasAnalysis: false, a: {},
       score: 0, scoreColor: '#888', band: '', title: '', subtitle: '',
@@ -208,7 +210,6 @@
       calls: [], loading: true, audioUrl: '',
       report: blankReport(),
       retrying: {},
-      _chart: null,
       async init() {
         const res = await api.get('/api/v1/calls');
         this.calls = res.data || [];
@@ -265,9 +266,9 @@
       drawArc() {
         const el = this.$refs.arc;
         if (!el || !window.Chart || !this.report.arc.length) return;
-        if (this._chart) { this._chart.destroy(); this._chart = null; }
+        if (arcChart) { arcChart.destroy(); arcChart = null; }
         const arc = this.report.arc;
-        this._chart = new Chart(el.getContext('2d'), {
+        arcChart = new Chart(el, {
           type: 'line',
           data: {
             labels: arc.map((_, i) => (i === 0 ? 'start' : i === arc.length - 1 ? 'end' : '')),
