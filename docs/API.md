@@ -56,15 +56,38 @@ rotate on every use and are revocable server-side.
 ## Calls — `/calls`
 | Method | Path | Permission | Notes |
 |--------|------|-----------|-------|
-| POST | `/calls/click-to-call` | `calls.create` | `lead_id` and/or `to_number` (one required) |
+| POST | `/calls/upload-recording` | `calls.create` | **mobile dialer** — multipart upload of a recorded call (see below) |
+| POST | `/calls/click-to-call` | `calls.create` | `lead_id` and/or `to_number` (one required) — only if a cloud provider is configured |
 | GET | `/calls` | `calls.view` | filters `lead_id, status`; paginated. Counselors see only their own calls |
 | GET | `/calls/:id` | `calls.view` | full call incl. `recording`, `transcript`, `analysis`, `lead` |
 | GET | `/calls/:id/recording-url` | `calls.recording.view` | time-limited URL to the archived recording |
 | GET | `/calls/recordings/stream?key=` | `calls.recording.view` | streams a local-storage recording (used when `STORAGE_DRIVER=local`) |
 
-**`POST /calls/click-to-call`** dials the agent's `agent_extension`/`phone`,
-bridges to the lead's number, creates a `call_logs` row (`status` from the
-provider) and returns `201 { data: <call> }`.
+### `POST /calls/upload-recording` (mobile dialer flow)
+There is no cloud telephony provider: agents place calls from their phone's
+native dialer, and the mobile app uploads the recording afterwards. Send
+`multipart/form-data` with the audio file in the **`recording`** field plus
+metadata fields:
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `recording` | ✓ | audio file (`mp3, m4a, aac, amr, wav, ogg, opus, webm, 3gp, flac`), ≤ 50 MB |
+| `lead_id` | – | links the call to a lead (its student phone is used if `to_number` omitted) |
+| `to_number` | required if no `lead_id` | number that was dialled |
+| `from_number` | – | defaults to the agent's `phone` / `agent_extension` |
+| `direction` | – | `outbound` (default) or `inbound` |
+| `status` | – | defaults to `completed` |
+| `duration_seconds` | – | total call seconds (drives the dashboard call-trend) |
+| `talk_time_seconds` | – | billable talk time; defaults to `duration_seconds` |
+| `started_at` / `ended_at` | – | ISO timestamps; `ended_at` derived from `started_at + duration` if omitted |
+| `is_missed` | – | `true`/`false` |
+| `client_call_id` | – | client-generated id; makes the upload **idempotent** (safe to retry) |
+
+Auth is the normal `Authorization: Bearer <accessToken>`. The agent is taken
+from the token (`agent_id`). The recording is archived immediately (so it is
+`archived`, not `pending`), then transcription + AI analysis run in the
+background. Returns `201 { data: <call incl. recording> }`. The call then
+appears in `GET /calls`, `GET /calls/:id` and the dashboard like any other.
 
 **`GET /calls/:id/recording-url`** returns `{ data: { url } }`. The recording
 must be archived (have a `storage_key`) or it responds `404 Recording not
@@ -72,19 +95,21 @@ available`. For S3 the `url` is a presigned `GetObject` link valid for **15
 minutes**; for local storage it is the `…/recordings/stream` route above.
 
 ### Call recording → storage lifecycle
-1. A provider status callback hits `POST /telephony/webhook/:provider`.
-2. On a `completed` call that carries a `recordingUrl`, a `call_recordings`
-   row is created with `status: 'pending'` and a **transcription** job is
-   enqueued.
-3. The worker (`npm run worker`) downloads the provider audio and archives it
-   via `StorageService.putObject` under a date-partitioned key
-   `recordings/YYYY/MM/DD/call-<id>.mp3`, then sets
-   `storage_driver`, `storage_key`, `file_size_bytes`, `status: 'archived'`,
-   `archived_at`. Download/upload failures mark the row `status: 'failed'`
-   and the job retries (3 attempts, exponential backoff).
-4. Transcription (Whisper) and AI analysis run next, off the request path.
+**Mobile upload (primary):** `POST /calls/upload-recording` stores the audio
+via `StorageService.putObject` under `recordings/YYYY/MM/DD/call-<id>.<ext>`,
+creates the `call_logs` + `call_recordings` (`status: 'archived'`) rows, then
+enqueues the transcription/analysis pipeline.
 
-`call_recordings.status`: `pending` → `archived` (or `failed`).
+**Provider webhook (optional, if a cloud provider is wired up):**
+1. A provider status callback hits `POST /telephony/webhook/:provider`.
+2. On a `completed` call carrying a `recordingUrl`, a `call_recordings` row is
+   created `status: 'pending'` and a transcription job is enqueued.
+3. The worker (`npm run worker`) downloads the provider audio, archives it and
+   sets `storage_driver, storage_key, file_size_bytes, status: 'archived'`.
+   Failures mark the row `failed`; the job retries (3 attempts, backoff).
+
+In both cases transcription (Whisper) and AI analysis then run off the request
+path. `call_recordings.status`: `pending` → `archived` (or `failed`).
 
 ### Storage configuration
 | Env | Default | Notes |

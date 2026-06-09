@@ -140,9 +140,40 @@ paths:
         - { name: lead_id, in: query, schema: { type: integer } }
         - { name: status, in: query, schema: { type: string } }
       responses: { '200': { description: Paginated calls } }
+  /calls/upload-recording:
+    post:
+      summary: Upload a mobile-dialer call recording + metadata
+      description: >-
+        Mobile flow (no telephony provider): the agent calls from their phone
+        and the app uploads the recording here. Stores the audio to S3/local,
+        creates the call_logs + call_recordings rows (archived) and runs
+        transcription/analysis. Idempotent on client_call_id.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [recording]
+              properties:
+                recording: { type: string, format: binary }
+                lead_id: { type: integer }
+                to_number: { type: string }
+                from_number: { type: string }
+                direction: { type: string, enum: [outbound, inbound] }
+                status: { type: string }
+                duration_seconds: { type: integer }
+                talk_time_seconds: { type: integer }
+                started_at: { type: string, format: date-time }
+                ended_at: { type: string, format: date-time }
+                is_missed: { type: boolean }
+                client_call_id: { type: string }
+      responses:
+        '201': { description: Recording stored (call incl. recording) }
+        '400': { description: Missing/invalid file or destination number }
   /calls/click-to-call:
     post:
-      summary: Initiate a click-to-call
+      summary: Initiate a click-to-call (only if a cloud provider is configured)
       requestBody:
         content:
           application/json:

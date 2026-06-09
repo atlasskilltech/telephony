@@ -1,11 +1,20 @@
 'use strict';
 
+const crypto = require('crypto');
 const db = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
+const storageService = require('./storageService');
 const { getProvider } = require('./telephony');
 const { transcriptionQueue, notificationQueue } = require('../queues');
-const { NOTIFICATION_EVENTS } = require('../utils/constants');
+const { NOTIFICATION_EVENTS, CALL_DIRECTIONS, CALL_STATUSES } = require('../utils/constants');
+const { audioMime, extFromUpload } = require('../utils/mime');
+
+const toInt = (v) => {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+const toBool = (v) => v === true || v === 'true' || v === '1' || v === 1;
 
 /**
  * Orchestrates outbound dialling and inbound webhook processing, persisting
@@ -50,6 +59,111 @@ class TelephonyService {
       description: `Outbound call initiated to ${customerNumber}`,
     });
 
+    return call;
+  }
+
+  /**
+   * Store a call placed from an agent's mobile dialer. There is no telephony
+   * provider in this flow — the mobile app records the call locally and uploads
+   * the audio plus metadata here. We archive the recording, persist the
+   * call_logs / call_recordings rows and run the transcription + analysis
+   * pipeline, so mobile calls show up exactly like provider calls in the UI.
+   *
+   * Idempotent on `client_call_id` so a retried upload does not duplicate.
+   */
+  async recordMobileCall({
+    agent,
+    file,
+    leadId,
+    toNumber,
+    fromNumber,
+    direction,
+    status,
+    durationSeconds,
+    talkTimeSeconds,
+    startedAt,
+    endedAt,
+    isMissed,
+    clientCallId,
+  }) {
+    if (!file || !file.buffer || !file.buffer.length) {
+      throw ApiError.badRequest('No recording file uploaded');
+    }
+
+    const lead = leadId
+      ? await db.Lead.findByPk(leadId, { include: [{ model: db.Student, as: 'student' }] })
+      : null;
+    if (leadId && !lead) throw ApiError.notFound('Lead not found');
+
+    const customerNumber = toNumber || (lead && lead.student && lead.student.phone);
+    if (!customerNumber) {
+      throw ApiError.badRequest('to_number is required when no lead phone is available');
+    }
+
+    const dir = direction === CALL_DIRECTIONS.INBOUND ? CALL_DIRECTIONS.INBOUND : CALL_DIRECTIONS.OUTBOUND;
+    const start = startedAt ? new Date(startedAt) : new Date();
+    const duration = toInt(durationSeconds);
+    const talk = talkTimeSeconds != null ? toInt(talkTimeSeconds) : duration;
+    const ended = endedAt ? new Date(endedAt) : new Date(start.getTime() + duration * 1000);
+    const providerCallId = `mobile-${clientCallId || crypto.randomUUID()}`;
+
+    // Idempotent create keyed on the (unique) provider_call_id.
+    const [call, isNew] = await db.CallLog.findOrCreate({
+      where: { provider_call_id: providerCallId },
+      defaults: {
+        provider: 'mobile',
+        provider_call_id: providerCallId,
+        lead_id: lead ? lead.id : null,
+        agent_id: agent.id,
+        direction: dir,
+        from_number: fromNumber || agent.phone || agent.agent_extension || null,
+        to_number: customerNumber,
+        status: status || CALL_STATUSES.COMPLETED,
+        duration_seconds: duration,
+        talk_time_seconds: talk,
+        is_missed: toBool(isMissed),
+        started_at: start,
+        ended_at: ended,
+      },
+    });
+
+    // Already processed (retry) — return the existing call + recording.
+    if (!isNew) {
+      const existing = await db.CallRecording.findOne({ where: { call_id: call.id } });
+      if (existing) {
+        call.setDataValue('recording', existing);
+        return call;
+      }
+    }
+
+    // Archive the uploaded audio under a date-partitioned key.
+    const ext = extFromUpload(file);
+    const key = storageService.buildRecordingKey(`call-${call.id}.${ext}`, start);
+    const stored = await storageService.putObject(key, file.buffer, audioMime(ext));
+
+    const recording = await db.CallRecording.create({
+      call_id: call.id,
+      storage_driver: stored.driver,
+      storage_key: stored.key,
+      file_size_bytes: file.size || file.buffer.length,
+      duration_seconds: duration || null,
+      format: ext,
+      status: 'archived',
+      archived_at: new Date(),
+    });
+
+    await db.ActivityLog.create({
+      user_id: agent.id,
+      subject_type: 'lead',
+      subject_id: lead ? lead.id : 0,
+      action: 'call.recorded',
+      description: `Mobile call recording uploaded for ${customerNumber}`,
+    });
+
+    // Transcribe + analyse off the request path (stub output if AI disabled).
+    await transcriptionQueue.add('transcribe', { callId: call.id, recordingId: recording.id });
+
+    call.setDataValue('recording', recording);
     return call;
   }
 
