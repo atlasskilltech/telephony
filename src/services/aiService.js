@@ -95,14 +95,18 @@ class AiService {
         "product_knowledge": number, "communication": number,
         "objection_handling": number, "closing": number },
       "call_quality_score": number, "agent_score": number,
-      "improvement_suggestions": string[] }`;
+      "improvement_suggestions": string[],
+      "positive_points": string[], "negative_points": string[],
+      "recommendations": string[],
+      "sentiment_arc": number[] }`;
 
     const user = `Course context: ${context.course || 'N/A'}, City: ${context.city || 'N/A'}.
 Transcript:
 """
 ${transcriptText.slice(0, 12000)}
 """
-Return JSON exactly in this schema (qa_scores values are 0-10):
+Return JSON exactly in this schema (qa_scores values are 0-10; sentiment_arc is
+6-10 numbers from -1 to 1 showing how customer sentiment moved through the call):
 ${schema}`;
 
     const res = await this.client.chat.completions.create({
@@ -144,6 +148,20 @@ ${schema}`;
       call_quality_score: 70,
       agent_score: 72,
       improvement_suggestions: ['Address fee objection with scholarship info earlier'],
+      positive_points: [
+        'Warm greeting and clear introduction',
+        'Empathised with the fee concern',
+        'Offered a concrete next step (campus visit)',
+      ],
+      negative_points: [
+        'Did not gather the student’s preferred intake',
+        'Scholarship options mentioned only at the end',
+      ],
+      recommendations: [
+        'Share the fee structure and scholarship sheet within 24h',
+        'Schedule a campus visit and confirm by SMS',
+      ],
+      sentiment_arc: [0.2, -0.3, 0.1, 0.4, 0.6, 0.7],
       model: 'stub',
     };
   }
