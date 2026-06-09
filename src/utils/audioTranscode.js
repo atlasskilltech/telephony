@@ -32,8 +32,10 @@ function transcodeToMp3(buffer, sourceExt = 'bin') {
       return reject(new Error('ffmpeg binary not available (ffmpeg-static)'));
     }
     const id = crypto.randomBytes(8).toString('hex');
-    const inPath = path.join(os.tmpdir(), `rec-${id}.${sourceExt || 'bin'}`);
-    const outPath = path.join(os.tmpdir(), `rec-${id}.mp3`);
+    // Distinct in/out paths — if both ended in .mp3 (e.g. a mislabelled file)
+    // ffmpeg would refuse to edit the file in place.
+    const inPath = path.join(os.tmpdir(), `rec-${id}-in.${sourceExt || 'bin'}`);
+    const outPath = path.join(os.tmpdir(), `rec-${id}-out.mp3`);
     const cleanup = () => {
       fs.promises.unlink(inPath).catch(() => {});
       fs.promises.unlink(outPath).catch(() => {});
@@ -69,18 +71,28 @@ function transcodeToMp3(buffer, sourceExt = 'bin') {
 }
 
 /**
- * Ensure an audio buffer is in a Whisper-compatible format. If it already is,
- * returns it unchanged; otherwise transcodes to mp3.
+ * Produce a Whisper-ready audio buffer. We ALWAYS transcode to mp3 rather than
+ * trusting the stored extension — mobile uploads frequently carry a misleading
+ * or generic extension (e.g. ".mp3"/octet-stream) while the actual bytes are
+ * opus/aac/amr, which Whisper then rejects. ffmpeg detects the real format from
+ * the content, so transcoding is reliable regardless of the claimed extension.
+ *
+ * Falls back to the original buffer only if ffmpeg fails AND the declared
+ * format is already Whisper-native.
  * @returns {Promise<{buffer: Buffer, ext: string, filename: string}>}
  */
 async function ensureWhisperCompatible(buffer, extOrName, baseName = 'recording') {
   const ext = (String(extOrName || '').includes('.') ? extFromName(extOrName) : String(extOrName || '')).toLowerCase();
-  if (isWhisperCompatible(ext)) {
-    return { buffer, ext, filename: `${baseName}.${ext}` };
+  try {
+    const out = await transcodeToMp3(buffer, ext || 'bin');
+    return { buffer: out, ext: 'mp3', filename: `${baseName}.mp3` };
+  } catch (err) {
+    if (isWhisperCompatible(ext)) {
+      logger.warn(`ffmpeg transcode failed (${err.message}); using original ${ext} audio`);
+      return { buffer, ext, filename: `${baseName}.${ext}` };
+    }
+    throw err;
   }
-  logger.info(`Transcoding "${ext || 'unknown'}" recording to mp3 for transcription`);
-  const out = await transcodeToMp3(buffer, ext || 'bin');
-  return { buffer: out, ext: 'mp3', filename: `${baseName}.mp3` };
 }
 
 module.exports = { ensureWhisperCompatible, transcodeToMp3, isWhisperCompatible, WHISPER_FORMATS };
