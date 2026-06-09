@@ -26,16 +26,23 @@
               </td>
               <td class="px-4 py-3" x-text="fmt.duration(c.talk_time_seconds)"></td>
               <td class="px-4 py-3">
-                <button x-show="c.analysis && c.analysis.status==='completed'" @click="openReport(c)"
+                <span x-show="retrying[c.id]" class="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                  <svg class="animate-spin w-3.5 h-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                  </svg>
+                  processing…
+                </span>
+                <button x-show="!retrying[c.id] && c.analysis && c.analysis.status==='completed'" @click="openReport(c)"
                   class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
                   :class="c.analysis && c.analysis.sentiment==='positive' ? 'text-emerald-600' : (c.analysis && c.analysis.sentiment==='negative' ? 'text-rose-600' : 'text-slate-500')">
                   <span class="font-medium" x-text="Math.round(c.analysis ? (c.analysis.call_quality_score||c.analysis.agent_score||c.analysis.interest_score||0) : 0)"></span>
                   <span x-text="'· ' + (c.analysis ? c.analysis.sentiment : '')"></span>
                   <span class="underline opacity-70">report</span>
                 </button>
-                <span x-show="!c.analysis || (c.analysis.status!=='completed' && c.analysis.status!=='failed')" class="text-slate-400 text-xs">pending</span>
-                <span x-show="c.analysis && c.analysis.status==='failed'" class="text-rose-500 text-xs">failed</span>
-                <button x-show="c.recording && (!c.analysis || c.analysis.status==='failed')" @click="retry(c)"
+                <span x-show="!retrying[c.id] && (!c.analysis || (c.analysis.status!=='completed' && c.analysis.status!=='failed'))" class="text-slate-400 text-xs">pending</span>
+                <span x-show="!retrying[c.id] && c.analysis && c.analysis.status==='failed'" class="text-rose-500 text-xs">failed</span>
+                <button x-show="!retrying[c.id] && c.recording" @click="retry(c)"
                   class="ml-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Retry</button>
               </td>
               <td class="px-4 py-3">
@@ -200,6 +207,7 @@
     return {
       calls: [], loading: true, audioUrl: '',
       report: blankReport(),
+      retrying: {},
       _chart: null,
       async init() {
         const res = await api.get('/api/v1/calls');
@@ -284,12 +292,17 @@
         } catch (e) { alert(e.message); }
       },
       async retry(c) {
+        this.retrying[c.id] = true;
         try {
           await api.post(`/api/v1/calls/${c.id}/retry-transcription`);
-          if (c.analysis) c.analysis.status = 'processing';
-          // Give the worker a few seconds, then refresh the list.
-          setTimeout(() => this.init(), 5000);
-        } catch (e) { alert(e.message); }
+          // Give the worker a few seconds, then refresh the list and clear the spinner.
+          setTimeout(async () => {
+            try { await this.init(); } finally { this.retrying[c.id] = false; }
+          }, 6000);
+        } catch (e) {
+          this.retrying[c.id] = false;
+          alert(e.message);
+        }
       },
     };
   };
