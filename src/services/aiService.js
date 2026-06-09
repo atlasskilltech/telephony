@@ -38,12 +38,20 @@ class AiService {
     }
 
     const file = await toFile(buffer, filename);
-    const res = await this.client.audio.transcriptions.create({
-      file,
-      model: config.ai.transcribeModel,
-      response_format: 'verbose_json',
-      timestamp_granularities: ['segment'],
-    });
+    // Translation task → always English text (handles Hindi/mixed audio).
+    // Transcription task → keeps the spoken language.
+    const res = config.ai.translateToEnglish
+      ? await this.client.audio.translations.create({
+          file,
+          model: config.ai.transcribeModel,
+          response_format: 'verbose_json',
+        })
+      : await this.client.audio.transcriptions.create({
+          file,
+          model: config.ai.transcribeModel,
+          response_format: 'verbose_json',
+          timestamp_granularities: ['segment'],
+        });
 
     const segments = (res.segments || []).map((s, i) => ({
       id: i,
@@ -56,7 +64,7 @@ class AiService {
 
     return {
       text: res.text,
-      language: res.language || 'en',
+      language: config.ai.translateToEnglish ? 'en' : (res.language || 'en'),
       segments,
       confidence: this._avgConfidence(res.segments),
       model: config.ai.transcribeModel,

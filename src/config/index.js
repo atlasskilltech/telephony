@@ -76,6 +76,10 @@ const config = {
     apiKey: process.env.OPENAI_API_KEY || '',
     transcribeModel: process.env.OPENAI_TRANSCRIBE_MODEL || 'whisper-1',
     analysisModel: process.env.OPENAI_ANALYSIS_MODEL || 'gpt-4o-mini',
+    // Always produce English transcripts (Whisper translation task) regardless
+    // of the spoken language. Set AI_TRANSLATE_TO_ENGLISH=false to keep the
+    // original language.
+    translateToEnglish: toBool(process.env.AI_TRANSLATE_TO_ENGLISH, true),
   },
   storage: {
     driver: process.env.STORAGE_DRIVER || 'local',
