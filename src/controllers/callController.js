@@ -7,6 +7,7 @@ const { success, created, paginate } = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { ROLES } = require('../utils/constants');
+const { audioMime } = require('../utils/mime');
 
 const clickToCall = asyncHandler(async (req, res) => {
   const call = await telephonyService.clickToCall({
@@ -15,6 +16,29 @@ const clickToCall = asyncHandler(async (req, res) => {
     toNumber: req.body.to_number,
   });
   return created(res, { data: call, message: 'Call initiated' });
+});
+
+// Mobile dialer upload: stores the recorded audio + call metadata. No
+// telephony provider involved — the agent calls from their phone and the
+// app posts the recording here as multipart/form-data ('recording' file).
+const uploadRecording = asyncHandler(async (req, res) => {
+  if (!req.file) throw ApiError.badRequest('No recording file uploaded (field "recording")');
+  const call = await telephonyService.recordMobileCall({
+    agent: req.user,
+    file: req.file,
+    leadId: req.body.lead_id,
+    toNumber: req.body.to_number,
+    fromNumber: req.body.from_number,
+    direction: req.body.direction,
+    status: req.body.status,
+    durationSeconds: req.body.duration_seconds,
+    talkTimeSeconds: req.body.talk_time_seconds,
+    startedAt: req.body.started_at,
+    endedAt: req.body.ended_at,
+    isMissed: req.body.is_missed,
+    clientCallId: req.body.client_call_id,
+  });
+  return created(res, { data: call, message: 'Call recording stored' });
 });
 
 const list = asyncHandler(async (req, res) => {
@@ -66,7 +90,7 @@ const streamRecording = asyncHandler(async (req, res) => {
   const key = req.query.key;
   if (!key) throw ApiError.badRequest('Missing key');
   const stream = await storageService.getObjectStream(key);
-  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Content-Type', audioMime(key));
   stream.pipe(res);
 });
 
@@ -76,4 +100,4 @@ const webhook = asyncHandler(async (req, res) => {
   return res.status(200).json({ received: true });
 });
 
-module.exports = { clickToCall, list, show, recordingUrl, streamRecording, webhook };
+module.exports = { clickToCall, uploadRecording, list, show, recordingUrl, streamRecording, webhook };
