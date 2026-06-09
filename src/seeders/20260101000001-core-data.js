@@ -2,6 +2,7 @@
 
 const bcrypt = require('bcryptjs');
 const { ROLES, PIPELINE_STAGES } = require('../utils/constants');
+const { withPrefix } = require('../config/tablePrefix');
 
 /**
  * Seeds the minimum data required to log in and operate the CRM:
@@ -20,10 +21,10 @@ module.exports = {
       { name: 'QA Team', slug: ROLES.QA, description: 'Audit recordings' },
       { name: 'Management', slug: ROLES.MANAGEMENT, description: 'View analytics and KPIs' },
     ].map((r) => ({ ...r, is_system: true, created_at: now, updated_at: now }));
-    await queryInterface.bulkInsert('roles', roles);
+    await queryInterface.bulkInsert(withPrefix('roles'), roles);
 
     const roleRows = await queryInterface.sequelize.query(
-      'SELECT id, slug FROM roles',
+      `SELECT id, slug FROM ${withPrefix('roles')}`,
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
     const roleId = Object.fromEntries(roleRows.map((r) => [r.slug, r.id]));
@@ -53,10 +54,10 @@ module.exports = {
         });
       }
     }
-    await queryInterface.bulkInsert('permissions', permissions);
+    await queryInterface.bulkInsert(withPrefix('permissions'), permissions);
 
     const permRows = await queryInterface.sequelize.query(
-      'SELECT id, slug, module FROM permissions',
+      `SELECT id, slug, module FROM ${withPrefix('permissions')}`,
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
 
@@ -95,11 +96,11 @@ module.exports = {
         p.slug.endsWith('.view') || p.module === 'reports' || p.module === 'ai'
       )
     );
-    await queryInterface.bulkInsert('role_permissions', rolePerms);
+    await queryInterface.bulkInsert(withPrefix('role_permissions'), rolePerms);
 
     // ---- Super admin user ----
     const password = await bcrypt.hash('Admin@12345', 12);
-    await queryInterface.bulkInsert('users', [
+    await queryInterface.bulkInsert(withPrefix('users'), [
       {
         uuid: require('crypto').randomUUID(),
         name: 'Super Admin',
@@ -137,7 +138,7 @@ module.exports = {
       created_at: now,
       updated_at: now,
     }));
-    await queryInterface.bulkInsert('lead_statuses', statuses);
+    await queryInterface.bulkInsert(withPrefix('lead_statuses'), statuses);
 
     // ---- Lead sources ----
     const sources = [
@@ -148,16 +149,16 @@ module.exports = {
       { name: 'API', slug: 'api', channel: 'api' },
       { name: 'Walk In', slug: 'walk_in', channel: 'manual' },
     ].map((s) => ({ ...s, is_active: true, created_at: now, updated_at: now }));
-    await queryInterface.bulkInsert('lead_sources', sources);
+    await queryInterface.bulkInsert(withPrefix('lead_sources'), sources);
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete('role_permissions', null, {});
-    await queryInterface.bulkDelete('user_permissions', null, {});
-    await queryInterface.bulkDelete('users', null, {});
-    await queryInterface.bulkDelete('permissions', null, {});
-    await queryInterface.bulkDelete('lead_sources', null, {});
-    await queryInterface.bulkDelete('lead_statuses', null, {});
-    await queryInterface.bulkDelete('roles', null, {});
+    await queryInterface.bulkDelete(withPrefix('role_permissions'), null, {});
+    await queryInterface.bulkDelete(withPrefix('user_permissions'), null, {});
+    await queryInterface.bulkDelete(withPrefix('users'), null, {});
+    await queryInterface.bulkDelete(withPrefix('permissions'), null, {});
+    await queryInterface.bulkDelete(withPrefix('lead_sources'), null, {});
+    await queryInterface.bulkDelete(withPrefix('lead_statuses'), null, {});
+    await queryInterface.bulkDelete(withPrefix('roles'), null, {});
   },
 };

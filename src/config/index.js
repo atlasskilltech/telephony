@@ -29,6 +29,7 @@ const config = {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     dialect: process.env.DB_DIALECT || 'mysql',
+    tablePrefix: require('./tablePrefix').tablePrefix,
     poolMax: toInt(process.env.DB_POOL_MAX, 20),
     poolMin: toInt(process.env.DB_POOL_MIN, 2),
     logging: toBool(process.env.DB_LOGGING, false),

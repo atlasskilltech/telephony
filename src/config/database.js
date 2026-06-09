@@ -2,6 +2,7 @@
 
 const { Sequelize } = require('sequelize');
 const config = require('./index');
+const { withPrefix } = require('./tablePrefix');
 const logger = require('../utils/logger');
 
 /**
@@ -32,6 +33,17 @@ const sequelize = new Sequelize(config.db.name, config.db.user, config.db.passwo
     charset: 'utf8mb4',
     collate: 'utf8mb4_unicode_ci',
   },
+});
+
+// Namespace every model's table with the configured prefix (default
+// `telephony_`). Models keep declaring bare table names (`users`, `leads`, …);
+// this hook rewrites them once, centrally, so the prefix stays in one place.
+// Associations resolve through each model's resolved tableName, so they pick
+// up the prefix automatically.
+sequelize.addHook('beforeDefine', (attributes, options) => {
+  if (options.tableName) {
+    options.tableName = withPrefix(options.tableName);
+  }
 });
 
 async function connectDatabase() {
