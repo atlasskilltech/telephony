@@ -6,6 +6,7 @@ const aiService = require('../../services/aiService');
 const storageService = require('../../services/storageService');
 const logger = require('../../utils/logger');
 const { audioMime } = require('../../utils/mime');
+const { ensureWhisperCompatible } = require('../../utils/audioTranscode');
 const { analysisQueue } = require('../index');
 
 /**
@@ -57,7 +58,10 @@ module.exports = async function transcriptionJob(job) {
     defaults: { call_id: callId, status: 'processing' },
   });
   try {
-    const result = await aiService.transcribe(buffer, filename);
+    // Mobile dialers emit formats Whisper can't read (amr/3gp/aac/opus) — make
+    // sure we hand it a compatible file, transcoding to mp3 when necessary.
+    const audio = await ensureWhisperCompatible(buffer, ext, `call-${callId}`);
+    const result = await aiService.transcribe(audio.buffer, audio.filename);
     await transcript.update({
       language: result.language,
       text: result.text,
