@@ -14,6 +14,10 @@ Base URL: `/api/v1` · Format: JSON · Auth: `Authorization: Bearer <accessToken
 ### Pagination meta
 `{ page, limit, total, totalPages, offset }` — query with `?page=&limit=` (max 100).
 
+> Note: the web UI currently exposes **Dashboard, Leads and Calls** only.
+> The Pipeline/Follow-ups/Reports pages are hidden, but their API endpoints
+> below remain available for API clients.
+
 ---
 
 ## Authentication — `/auth`
@@ -112,7 +116,8 @@ enqueues the transcription/analysis pipeline.
 1. A provider status callback hits `POST /telephony/webhook/:provider`.
 2. On a `completed` call carrying a `recordingUrl`, a `call_recordings` row is
    created `status: 'pending'` and a transcription job is enqueued.
-3. The worker (`npm run worker`) downloads the provider audio, archives it and
+3. The worker (in-process by default — `INLINE_WORKERS=true`; or a separate
+   `npm run worker`) downloads the provider audio, archives it and
    sets `storage_driver, storage_key, file_size_bytes, status: 'archived'`.
    Failures mark the row `failed`; the job retries (3 attempts, backoff).
 
