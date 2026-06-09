@@ -131,6 +131,15 @@ paths:
               type: object
               properties: { file: { type: string, format: binary } }
       responses: { '200': { description: Preview } }
+  /calls:
+    get:
+      summary: List calls (paginated; counselors see only their own)
+      parameters:
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: lead_id, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string } }
+      responses: { '200': { description: Paginated calls } }
   /calls/click-to-call:
     post:
       summary: Initiate a click-to-call
@@ -144,6 +153,38 @@ paths:
       summary: Get a call with recording, transcript and AI analysis
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses: { '200': { description: Call } }
+  /calls/{id}/recording-url:
+    get:
+      summary: Get a time-limited URL for the archived recording
+      description: >-
+        Returns `{ data: { url } }`. For S3 the URL is a presigned GetObject
+        link valid for 15 minutes; for local storage it is the stream route.
+        404 if the recording has not been archived yet.
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Signed/stream URL }
+        '404': { description: Recording not available }
+  /calls/recordings/stream:
+    get:
+      summary: Stream a local-storage recording (STORAGE_DRIVER=local)
+      parameters:
+        - { name: key, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: audio/mpeg stream }
+        '400': { description: Missing key }
+  /telephony/webhook/{provider}:
+    post:
+      summary: Provider status callback (signature-verified)
+      description: >-
+        Public, no auth — verified by the provider signature. Idempotent on
+        provider_call_id. On a completed call with a recording it creates a
+        pending recording and enqueues transcription + storage archival.
+      security: []
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Accepted }
+        '401': { description: Invalid signature }
   /followups:
     get: { summary: List follow-ups, responses: { '200': { description: OK } } }
     post: { summary: Create follow-up, responses: { '201': { description: Created } } }

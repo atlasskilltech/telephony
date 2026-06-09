@@ -16,16 +16,24 @@ class StorageService {
   }
 
   _initS3() {
+    const { region, accessKeyId, secretAccessKey, bucket } = config.storage.aws;
+    if (!bucket) {
+      throw new Error('STORAGE_DRIVER=s3 requires AWS_S3_BUCKET to be set');
+    }
+
     // Lazy require so the AWS SDK is only loaded when actually using S3.
     const { S3Client } = require('@aws-sdk/client-s3');
-    this.s3 = new S3Client({
-      region: config.storage.aws.region,
-      credentials: {
-        accessKeyId: config.storage.aws.accessKeyId,
-        secretAccessKey: config.storage.aws.secretAccessKey,
-      },
-    });
-    this.bucket = config.storage.aws.bucket;
+    const clientConfig = { region };
+    // Only pass static credentials when both are provided. Otherwise leave them
+    // out so the SDK's default provider chain (EC2/ECS IAM role, shared config,
+    // env vars) can resolve them — passing empty strings breaks that chain.
+    if (accessKeyId && secretAccessKey) {
+      clientConfig.credentials = { accessKeyId, secretAccessKey };
+    } else {
+      logger.info('S3 static credentials not set — using default AWS credential provider chain');
+    }
+    this.s3 = new S3Client(clientConfig);
+    this.bucket = bucket;
   }
 
   /** Build a date-partitioned recording key. */
