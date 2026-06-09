@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Admission CRM & Telephony API",
+    "name": "ATLAS Telephony API",
     "description": "Mobile/web REST API. Set {{baseUrl}} and run Auth > Login first; the access/refresh tokens are saved to collection variables automatically. All requests use bearer auth except the public Telephony webhook.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
