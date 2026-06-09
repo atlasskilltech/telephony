@@ -26,13 +26,18 @@ module.exports = {
       deleted_at: { type: DATE, allowNull: true },
     });
     const id = () => ({ type: BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true });
-    const fk = (table, opts = {}) => ({
-      type: BIGINT.UNSIGNED,
-      allowNull: opts.allowNull !== false,
-      references: { model: withPrefix(table), key: 'id' },
-      onUpdate: 'CASCADE',
-      onDelete: opts.onDelete || 'SET NULL',
-    });
+    const fk = (table, opts = {}) => {
+      const allowNull = opts.allowNull !== false;
+      return {
+        type: BIGINT.UNSIGNED,
+        allowNull,
+        references: { model: withPrefix(table), key: 'id' },
+        onUpdate: 'CASCADE',
+        // SET NULL is illegal on a NOT NULL column (MySQL errno 150), so a
+        // required FK falls back to RESTRICT unless an explicit rule is given.
+        onDelete: opts.onDelete || (allowNull ? 'SET NULL' : 'RESTRICT'),
+      };
+    };
 
     // ---- roles ----
     await createTable('roles', {
