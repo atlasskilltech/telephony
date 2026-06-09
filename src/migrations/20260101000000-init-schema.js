@@ -81,6 +81,7 @@ module.exports = {
       team_leader_id: fk('users'),
       agent_extension: { type: STRING(40), allowNull: true },
       avatar_url: { type: STRING(255), allowNull: true },
+      meta: { type: JSON, allowNull: true },
       status: { type: ENUM('active', 'inactive', 'suspended'), defaultValue: 'active' },
       last_login_at: t(),
       reset_token: { type: STRING(255), allowNull: true },

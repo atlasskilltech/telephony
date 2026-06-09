@@ -53,6 +53,9 @@ module.exports = (sequelize) => {
       // Telephony agent extension/SIP id for click-to-call dialling.
       agent_extension: { type: DataTypes.STRING(40), allowNull: true },
       avatar_url: { type: DataTypes.STRING(255), allowNull: true },
+      // Free-form JSON for per-user settings, e.g. assignment specialisations
+      // { courses: [...], cities: [...] } used by AssignmentService.
+      meta: { type: DataTypes.JSON, allowNull: true },
       status: { type: DataTypes.ENUM('active', 'inactive', 'suspended'), defaultValue: 'active' },
       last_login_at: { type: DataTypes.DATE, allowNull: true },
       reset_token: { type: DataTypes.STRING(255), allowNull: true },
