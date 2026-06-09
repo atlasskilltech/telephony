@@ -10,5 +10,6 @@ router.get('/', requirePermission('dashboard.view'), dashboardController.overvie
 router.get('/stats', requirePermission('dashboard.view'), dashboardController.stats);
 router.get('/funnel', requirePermission('dashboard.view'), dashboardController.funnel);
 router.get('/call-trend', requirePermission('dashboard.view'), dashboardController.callTrend);
+router.get('/call-analytics', requirePermission('dashboard.view'), dashboardController.callAnalytics);
 
 module.exports = router;
