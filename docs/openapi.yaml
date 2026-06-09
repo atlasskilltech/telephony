@@ -184,6 +184,16 @@ paths:
       summary: Get a call with recording, transcript and AI analysis
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses: { '200': { description: Call } }
+  /calls/{id}/retry-transcription:
+    post:
+      summary: Re-queue transcription + analysis for a stored recording
+      description: >-
+        Re-runs the pipeline for an existing call without re-uploading. Useful
+        for recovering calls whose jobs previously failed.
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Transcription re-queued }
+        '404': { description: No recording for this call }
   /calls/{id}/recording-url:
     get:
       summary: Get a time-limited URL for the archived recording

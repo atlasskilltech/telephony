@@ -26,8 +26,12 @@
               </td>
               <td class="px-4 py-3" x-text="fmt.duration(c.talk_time_seconds)"></td>
               <td class="px-4 py-3">
-                <span x-show="c.analysis" class="text-xs" x-text="c.analysis ? (c.analysis.sentiment + ' · ' + (c.analysis.interest_score||'') + '%') : ''"></span>
-                <span x-show="!c.analysis" class="text-slate-400 text-xs">pending</span>
+                <span x-show="c.analysis && c.analysis.status==='completed'" class="text-xs"
+                  x-text="c.analysis ? (c.analysis.sentiment + ' · ' + (c.analysis.interest_score||'') + '%') : ''"></span>
+                <span x-show="!c.analysis || (c.analysis.status!=='completed' && c.analysis.status!=='failed')" class="text-slate-400 text-xs">pending</span>
+                <span x-show="c.analysis && c.analysis.status==='failed'" class="text-rose-500 text-xs">failed</span>
+                <button x-show="c.recording && (!c.analysis || c.analysis.status==='failed')" @click="retry(c)"
+                  class="ml-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Retry</button>
               </td>
               <td class="px-4 py-3">
                 <button x-show="c.recording" @click="play(c)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">▶ Play</button>
@@ -56,6 +60,14 @@
           const res = await api.get(`/api/v1/calls/${c.id}/recording-url`);
           this.audioUrl = res.data.url;
           this.$nextTick(() => this.$refs.player.play());
+        } catch (e) { alert(e.message); }
+      },
+      async retry(c) {
+        try {
+          await api.post(`/api/v1/calls/${c.id}/retry-transcription`);
+          if (c.analysis) c.analysis.status = 'processing';
+          // Give the worker a few seconds, then refresh the list.
+          setTimeout(() => this.init(), 5000);
         } catch (e) { alert(e.message); }
       },
     };

@@ -275,6 +275,14 @@
         },
         { "name": "Get", "request": { "method": "GET", "url": "{{baseUrl}}/calls/1" } },
         {
+          "name": "Retry transcription",
+          "request": {
+            "method": "POST",
+            "description": "Re-queue transcription + analysis for a stored recording (no re-upload).",
+            "url": "{{baseUrl}}/calls/1/retry-transcription"
+          }
+        },
+        {
           "name": "Recording URL",
           "request": {
             "method": "GET",
