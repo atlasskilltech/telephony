@@ -1,7 +1,7 @@
 {
   "name": "admission-crm-telephony",
   "version": "1.0.0",
-  "description": "AI-Powered Admission CRM & Cloud Telephony System for university admission teams",
+  "description": "AI-Powered ATLAS Telephony & Cloud Telephony System for university admission teams",
   "main": "src/server.js",
   "engines": {
     "node": ">=20.0.0"

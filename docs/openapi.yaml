@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Admission CRM & Cloud Telephony API
+  title: ATLAS Telephony & Cloud Telephony API
   version: 1.0.0
   description: >-
-    REST API for the AI-Powered Admission CRM. JWT bearer auth; rotating refresh
+    REST API for the AI-Powered ATLAS Telephony platform. JWT bearer auth; rotating refresh
     tokens. Import into Swagger UI or Postman.
 servers:
   - url: '{baseUrl}/api/v1'

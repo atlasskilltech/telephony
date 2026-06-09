@@ -17,7 +17,7 @@ const config = {
   env: process.env.NODE_ENV || 'development',
   isProd: (process.env.NODE_ENV || 'development') === 'production',
   app: {
-    name: process.env.APP_NAME || 'Admission CRM',
+    name: process.env.APP_NAME || 'ATLAS Telephony',
     url: process.env.APP_URL || 'http://localhost:3000',
     port: toInt(process.env.PORT, 3000),
     corsOrigins: toList(process.env.CORS_ORIGINS, ['*']),

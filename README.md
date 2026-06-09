@@ -1,4 +1,4 @@
-# AI-Powered Admission CRM & Cloud Telephony System
+# AI-Powered ATLAS Telephony & Cloud Telephony System
 
 A production-grade admission management platform for university admission teams:
 lead ingestion (Excel/CSV/API/website/Facebook), automatic counselor assignment,
