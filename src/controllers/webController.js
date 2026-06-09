@@ -1,8 +1,13 @@
 'use strict';
 
+const crypto = require('crypto');
 const authService = require('../services/authService');
 const { setAuthCookies } = require('./authController');
 const asyncHandler = require('../utils/asyncHandler');
+const config = require('../config');
+
+const renderLoginError = (res, error, status = 401) =>
+  res.status(status).render('auth/login', { title: 'Sign in', layout: 'layouts/blank', error });
 
 // Render helpers for the server-rendered dashboard. Page data itself is
 // hydrated client-side from the JSON API using the httpOnly cookie token.
@@ -30,6 +35,44 @@ const doLogin = asyncHandler(async (req, res) => {
   }
 });
 
+// Begin Google OAuth: set a CSRF state cookie and redirect to consent.
+const googleStart = (req, res) => {
+  if (!config.google.clientId) {
+    return renderLoginError(res, 'Google sign-in is not configured.', 503);
+  }
+  const state = crypto.randomBytes(16).toString('hex');
+  res.cookie('g_state', state, {
+    httpOnly: true,
+    secure: config.isProd,
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000,
+  });
+  return res.redirect(authService.googleAuthUrl({ state }));
+};
+
+// Google OAuth callback: verify state, exchange code, sign in (existing users only).
+const googleCallback = asyncHandler(async (req, res) => {
+  const { code, state, error } = req.query;
+  const expected = req.cookies && req.cookies.g_state;
+  res.clearCookie('g_state');
+
+  if (error) return renderLoginError(res, 'Google sign-in was cancelled.');
+  if (!code || !state || !expected || state !== expected) {
+    return renderLoginError(res, 'Invalid or expired sign-in attempt. Please try again.', 400);
+  }
+  try {
+    const result = await authService.loginWithGoogle(code, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      deviceName: 'Web (Google)',
+    });
+    setAuthCookies(res, result);
+    return res.redirect('/dashboard');
+  } catch (err) {
+    return renderLoginError(res, err.message || 'Google sign-in failed');
+  }
+});
+
 const doLogout = asyncHandler(async (req, res) => {
   await authService.logout(req.cookies && req.cookies.refresh_token);
   res.clearCookie('access_token');
@@ -44,6 +87,8 @@ const page = (view, title) => (req, res) =>
 module.exports = {
   loginPage,
   doLogin,
+  googleStart,
+  googleCallback,
   doLogout,
   dashboard: page('dashboard', 'Dashboard'),
   leads: page('leads', 'Leads'),

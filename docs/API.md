@@ -32,6 +32,12 @@ Base URL: `/api/v1` · Format: JSON · Auth: `Authorization: Bearer <accessToken
 `login`/`refresh` return `{ user, accessToken, refreshToken }`. Refresh tokens
 rotate on every use and are revocable server-side.
 
+**Web sign-in is Google-only.** The browser app signs in via Google OAuth:
+`GET /google` → Google consent → `GET /google/callback` (registered redirect
+URI). Existing users only — the verified Google email must match an active
+account; restricted to `GOOGLE_HOSTED_DOMAIN`. The password `POST /auth/login`
+endpoint remains for API clients / admin break-glass but is not shown in the UI.
+
 ## Dashboard — `/dashboard`
 | GET `/dashboard` | combined overview (stats + funnel + trend) |
 | GET `/dashboard/stats` | KPI cards |
