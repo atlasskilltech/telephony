@@ -17,12 +17,27 @@
     <button @click="showCreate = true" class="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">+ New Lead</button>
   </div>
 
+  <!-- Assign bar (single or bulk) — shown to users who can assign -->
+  <div x-show="assignees.length" class="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+    <span class="text-sm text-slate-500" x-text="selectedCount() + ' selected'"></span>
+    <select x-model="assignTo" class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none text-sm">
+      <option value="">Assign to counselor…</option>
+      <template x-for="a in assignees" :key="a.id"><option :value="a.id" x-text="a.name"></option></template>
+    </select>
+    <button @click="assignSelected()" :disabled="!assignTo || !selectedCount() || assigning"
+      class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+      <span x-show="!assigning" x-text="'Assign ' + selectedCount() + ' lead(s)'"></span>
+      <span x-show="assigning">Assigning…</span>
+    </button>
+  </div>
+
   <!-- Table -->
   <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-left">
           <tr>
+            <th class="px-4 py-3 font-medium w-10" x-show="assignees.length"><input type="checkbox" :checked="allSelected()" @change="toggleAll($event)" /></th>
             <th class="px-4 py-3 font-medium">Lead</th>
             <th class="px-4 py-3 font-medium">Course</th>
             <th class="px-4 py-3 font-medium">Stage</th>
@@ -34,6 +49,7 @@
         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
           <template x-for="lead in leads" :key="lead.id">
             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <td class="px-4 py-3" x-show="assignees.length"><input type="checkbox" :checked="!!selected[lead.id]" @change="toggle(lead.id)" /></td>
               <td class="px-4 py-3">
                 <div class="font-medium" x-text="lead.student ? (lead.student.first_name + ' ' + (lead.student.last_name||'')) : '—'"></div>
                 <div class="text-xs text-slate-500" x-text="lead.student?.phone"></div>
@@ -50,7 +66,7 @@
               </td>
             </tr>
           </template>
-          <tr x-show="!loading && leads.length === 0"><td colspan="6" class="px-4 py-10 text-center text-slate-500">No leads found</td></tr>
+          <tr x-show="!loading && leads.length === 0"><td colspan="7" class="px-4 py-10 text-center text-slate-500">No leads found</td></tr>
         </tbody>
       </table>
     </div>

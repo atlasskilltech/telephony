@@ -43,6 +43,22 @@ const assign = asyncHandler(async (req, res) =>
   })
 );
 
+const assignees = asyncHandler(async (req, res) =>
+  success(res, { data: await leadService.assignees() })
+);
+
+const assignBulk = asyncHandler(async (req, res) =>
+  success(res, {
+    data: await leadService.assignBulk(req.user, {
+      ids: req.body.ids,
+      userId: req.body.user_id,
+      strategy: req.body.strategy,
+      note: req.body.note,
+    }),
+    message: 'Leads assigned',
+  })
+);
+
 const addNote = asyncHandler(async (req, res) =>
   created(res, { data: await leadService.addNote(req.user, req.params.id, req.body.note), message: 'Note added' })
 );
@@ -63,4 +79,6 @@ const destroy = asyncHandler(async (req, res) => {
   return success(res, { message: 'Lead deleted' });
 });
 
-module.exports = { list, show, store, update, assign, addNote, timeline, merge, destroy };
+module.exports = {
+  list, show, store, update, assign, assignees, assignBulk, addNote, timeline, merge, destroy,
+};

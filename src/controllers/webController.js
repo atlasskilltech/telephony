@@ -96,4 +96,5 @@ module.exports = {
   calls: page('calls', 'Calls'),
   followups: page('followups', 'Follow-ups'),
   reports: page('reports', 'Reports'),
+  users: page('users', 'Users'),
 };

@@ -14,9 +14,9 @@ Base URL: `/api/v1` · Format: JSON · Auth: `Authorization: Bearer <accessToken
 ### Pagination meta
 `{ page, limit, total, totalPages, offset }` — query with `?page=&limit=` (max 100).
 
-> Note: the web UI currently exposes **Dashboard, Leads and Calls** only.
-> The Pipeline/Follow-ups/Reports pages are hidden, but their API endpoints
-> below remain available for API clients.
+> Note: the web UI exposes **Dashboard, Leads, Calls** (and **Users** for
+> super-admin / admission-manager). Pipeline/Follow-ups/Reports pages are
+> hidden, but their API endpoints below remain available for API clients.
 
 ---
 
@@ -59,7 +59,9 @@ endpoint remains for API clients / admin break-glass but is not shown in the UI.
 | DELETE | `/leads/:id` | `leads.delete` | soft delete |
 | GET | `/leads/:id/timeline` | `leads.view` | activity timeline |
 | POST | `/leads/:id/notes` | `leads.update` | `note` |
-| POST | `/leads/:id/assign` | `leads.assign` | `user_id` or `strategy` |
+| GET | `/leads/assignees` | `leads.assign` | active counselors for the assign dropdown `[{id,name}]` |
+| POST | `/leads/:id/assign` | `leads.assign` | single — `user_id` or `strategy` |
+| POST | `/leads/assign-bulk` | `leads.assign` | bulk — `ids[]` + `user_id` (or `strategy`); returns `{total, assigned, failed, errors}` |
 | POST | `/leads/:id/merge` | `leads.merge` | `duplicate_id` |
 | POST | `/leads/import/preview` | `leads.import` | multipart `file` → mapping + sample |
 | POST | `/leads/import` | `leads.import` | multipart `file, mapping(JSON), source_id, skip_duplicates` |
@@ -152,6 +154,15 @@ responds `200 { received: true }` once accepted.
 ## Reports — `/reports`
 | GET `/reports/:type` | `counselor-performance \| lead-source \| course \| admission-funnel` |
 | GET `/reports/:type/export?format=csv\|excel` | download |
+
+## Users — `/users`
+| Method | Path | Permission | Notes |
+|--------|------|-----------|-------|
+| GET | `/users` | `users.view` | list; filters `search, role, status`; paginated |
+| GET | `/users/roles` | `users.view` | role list `[{id,name,slug}]` for the form |
+| POST | `/users` | `users.create` | `name, email, role_slug` required; `phone, agent_extension, team_leader_id, status, password?` optional. Sign-in is Google-only, so password is optional (a random one is stored). |
+| PUT | `/users/:id` | `users.update` | `name, phone, role_slug, agent_extension, team_leader_id, status, password?` |
+| DELETE | `/users/:id` | `users.delete` | deactivate (sets `status: inactive`; cannot deactivate self) |
 
 ## Profile — `/profile`
 | GET `/profile` · PUT `/profile` (`name, phone, avatar_url`) |

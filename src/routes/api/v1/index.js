@@ -13,6 +13,7 @@ const followupRoutes = require('./followups.routes');
 const notificationRoutes = require('./notifications.routes');
 const reportRoutes = require('./reports.routes');
 const profileRoutes = require('./profile.routes');
+const userRoutes = require('./users.routes');
 
 const router = express.Router();
 
@@ -33,5 +34,6 @@ router.use('/followups', followupRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/reports', reportRoutes);
 router.use('/profile', profileRoutes);
+router.use('/users', userRoutes);
 
 module.exports = router;
