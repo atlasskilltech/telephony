@@ -16,6 +16,7 @@ module.exports = {
     body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
     body('password').notEmpty().withMessage('Password required'),
   ],
+  googleLogin: [body('id_token').notEmpty().withMessage('id_token is required')],
   forgotPassword: [body('email').isEmail().withMessage('Valid email required').normalizeEmail()],
   resetPassword: [
     body('token').notEmpty().withMessage('Reset token required'),

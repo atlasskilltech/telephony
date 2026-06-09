@@ -116,15 +116,54 @@ class AuthService {
       throw ApiError.unauthorized('Could not read your Google profile');
     }
 
-    const email = (profile.email || '').toLowerCase().trim();
-    if (!email || profile.email_verified === false) {
+    if (profile.email_verified === false) {
       throw ApiError.unauthorized('Your Google email could not be verified');
     }
+    return this._completeGoogleSignIn(profile, ctx);
+  }
+
+  /**
+   * Mobile Google Sign-In: verify the Google ID token (via Google's tokeninfo
+   * endpoint), check audience + verified email, then sign the user in.
+   * Returns `{ user, accessToken, refreshToken }`.
+   */
+  async loginWithGoogleIdToken(idToken, ctx = {}) {
+    if (!idToken) throw ApiError.badRequest('id_token is required');
+    if (!config.google.allowedAudiences.length) {
+      throw ApiError.badRequest('Google sign-in is not configured');
+    }
+
+    let claims;
+    try {
+      const res = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+        params: { id_token: idToken },
+        timeout: 15000,
+      });
+      claims = res.data || {};
+    } catch (e) {
+      throw ApiError.unauthorized('Invalid or expired Google token');
+    }
+
+    // tokeninfo only returns for well-formed, unexpired tokens; still verify
+    // the audience so a token minted for another app can't be replayed here.
+    if (!claims.aud || !config.google.allowedAudiences.includes(claims.aud)) {
+      throw ApiError.unauthorized('Google token was not issued for this application');
+    }
+    if (claims.email_verified === false || claims.email_verified === 'false') {
+      throw ApiError.unauthorized('Your Google email is not verified');
+    }
+    return this._completeGoogleSignIn(claims, ctx);
+  }
+
+  /** Shared: enforce domain, match an existing active user, issue tokens. */
+  async _completeGoogleSignIn(profile, ctx = {}) {
+    const email = (profile.email || '').toLowerCase().trim();
+    if (!email) throw ApiError.unauthorized('Your Google email could not be verified');
     if (config.google.hostedDomain && !email.endsWith(`@${config.google.hostedDomain}`)) {
       throw ApiError.forbidden(`Please sign in with your @${config.google.hostedDomain} account`);
     }
 
-    // 3. Existing users only — no auto-provisioning.
+    // Existing users only — no auto-provisioning.
     const user = await db.User.scope(null).findOne({
       where: { email },
       include: [{ model: db.Role, as: 'role' }],

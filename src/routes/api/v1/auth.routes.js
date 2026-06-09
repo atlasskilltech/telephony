@@ -14,6 +14,8 @@ const router = express.Router();
  * Public authentication endpoints are rate-limited to deter brute force.
  */
 router.post('/login', authLimiter, validate(authValidator.login), authController.login);
+// Mobile Google Sign-In — app posts the Google ID token, server verifies it.
+router.post('/google', authLimiter, validate(authValidator.googleLogin), authController.googleLogin);
 router.post('/refresh', authController.refresh);
 router.post('/logout', authController.logout);
 router.post(

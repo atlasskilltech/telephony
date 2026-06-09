@@ -24,6 +24,7 @@ Base URL: `/api/v1` · Format: JSON · Auth: `Authorization: Bearer <accessToken
 | Method | Path | Auth | Body |
 |--------|------|------|------|
 | POST | `/auth/login` | – | `email, password, device_name?, device_id?` |
+| POST | `/auth/google` | – | `id_token, device_name?` — **mobile Google Sign-In** |
 | POST | `/auth/refresh` | – | `refresh_token` (or cookie) |
 | POST | `/auth/logout` | – | `refresh_token` |
 | POST | `/auth/forgot-password` | – | `email` |
@@ -35,6 +36,14 @@ Base URL: `/api/v1` · Format: JSON · Auth: `Authorization: Bearer <accessToken
 
 `login`/`refresh` return `{ user, accessToken, refreshToken }`. Refresh tokens
 rotate on every use and are revocable server-side.
+
+**Mobile sign-in (`POST /auth/google`).** The app does native Google Sign-In,
+obtains a Google **ID token**, and posts `{ id_token }`. The server verifies the
+token via Google (audience must be the configured web/Android/iOS client id,
+email must be verified, domain must match `GOOGLE_HOSTED_DOMAIN`), matches an
+existing active user by email, and returns `{ user, accessToken, refreshToken }`
+— same tokens as password login. Set `GOOGLE_MOBILE_CLIENT_IDS` (comma-separated)
+to the app's OAuth client id(s). There is **no** passwordless email login.
 
 **Web sign-in is Google-only.** The browser app signs in via Google OAuth:
 `GET /google` → Google consent → `GET /google/callback` (registered redirect
