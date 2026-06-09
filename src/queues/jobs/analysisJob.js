@@ -46,6 +46,10 @@ module.exports = async function analysisJob(job) {
       call_quality_score: a.call_quality_score,
       agent_score: a.agent_score,
       improvement_suggestions: a.improvement_suggestions,
+      positive_points: a.positive_points,
+      negative_points: a.negative_points,
+      recommendations: a.recommendations,
+      sentiment_arc: a.sentiment_arc,
       model: a.model,
       status: 'completed',
     });

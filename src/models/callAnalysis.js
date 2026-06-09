@@ -27,6 +27,12 @@ module.exports = (sequelize) => {
       objections: { type: DataTypes.JSON, allowNull: true },
       keywords: { type: DataTypes.JSON, allowNull: true },
       intent: { type: DataTypes.STRING(120), allowNull: true },
+      // Single-call report fields.
+      positive_points: { type: DataTypes.JSON, allowNull: true },
+      negative_points: { type: DataTypes.JSON, allowNull: true },
+      recommendations: { type: DataTypes.JSON, allowNull: true },
+      // Series of -1..1 sentiment values sampled across the call (for the arc).
+      sentiment_arc: { type: DataTypes.JSON, allowNull: true },
       // QA scorecard (0-10 each) and aggregate scores.
       qa_scores: { type: DataTypes.JSON, allowNull: true },
       call_quality_score: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
