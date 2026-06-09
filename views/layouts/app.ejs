@@ -8,8 +8,11 @@
   <script>tailwind.config = { darkMode: 'class' }</script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.socket.io/4.8.0/socket.io.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <!-- app.js must load before Alpine so the x-data component factories
+       (notifBell, leadsPage, dashboardPage) are defined as globals before
+       Alpine.start() walks the DOM and evaluates them. -->
   <script src="/public/js/app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   <style>
     body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
     .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(16px); }
