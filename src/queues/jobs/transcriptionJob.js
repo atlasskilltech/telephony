@@ -62,11 +62,19 @@ module.exports = async function transcriptionJob(job) {
     // sure we hand it a compatible file, transcoding to mp3 when necessary.
     const audio = await ensureWhisperCompatible(buffer, ext, `call-${callId}`);
     const result = await aiService.transcribe(audio.buffer, audio.filename);
+
+    // Assign Agent vs Student per segment from content + call direction
+    // (Whisper provides no speaker labels).
+    const call = await db.CallLog.findByPk(callId, { attributes: ['direction'] });
+    const segments = await aiService.diarizeSegments(result.segments, {
+      direction: call ? call.direction : undefined,
+    });
+
     await transcript.update({
       language: result.language,
       text: result.text,
-      segments: result.segments,
-      speaker_map: { agent: 'Counselor', customer: 'Student' },
+      segments,
+      speaker_map: { agent: 'Agent', customer: 'Student' },
       confidence: result.confidence,
       model: result.model,
       processing_ms: result.processingMs,
