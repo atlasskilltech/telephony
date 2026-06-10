@@ -90,28 +90,61 @@ class AiService {
   }
 
   /**
+   * Collapse runs of consecutive segments by the same speaker into one turn,
+   * concatenating the text and spanning the timestamps. Whisper over-splits a
+   * single speaker into many tiny segments, so this yields a readable, turn-by-
+   * turn transcript instead of dozens of one-line fragments.
+   */
+  _mergeConsecutiveTurns(segments = []) {
+    const merged = [];
+    for (const s of segments) {
+      const last = merged[merged.length - 1];
+      if (last && last.speaker === s.speaker) {
+        last.text = `${last.text} ${s.text}`.trim();
+        last.end = s.end;
+      } else {
+        merged.push({ ...s });
+      }
+    }
+    return merged.map((s, i) => ({ ...s, id: i }));
+  }
+
+  /**
    * Assign each transcript segment to the agent (university counselor) or the
    * customer (student) using conversational cues and the call direction.
    * Whisper has no speaker info, so this is content-based diarisation; falls
    * back to a direction-aware heuristic when AI is off or the call fails.
+   * Consecutive same-speaker segments are merged into clean turns.
    */
   async diarizeSegments(segments = [], { direction } = {}) {
     if (!segments.length) return segments;
-    if (!this.enabled) return this._heuristicSpeakers(segments, direction);
+    if (!this.enabled) {
+      return this._mergeConsecutiveTurns(this._heuristicSpeakers(segments, direction));
+    }
 
     const lines = segments.map((s, i) => `${i}: ${s.text}`).join('\n');
     const system =
-      'You label each utterance in an admission/sales phone call as the speaker: ' +
-      '"agent" (the university counselor who handles admissions/fees/process) or ' +
-      '"customer" (the prospective student/parent enquiring). Use conversational ' +
-      'cues — the agent guides the process, quotes fees, asks qualifying questions; ' +
-      'the customer asks about programs, reports problems, gives personal choices. ' +
-      'Respond ONLY with JSON {"speakers": [...]} of exactly one value ("agent" or ' +
-      '"customer") per line index, in order.';
+      'You are diarising a two-party admission phone call for an Indian university ' +
+      '(Atlas). Exactly two people speak and they take turns. Label each utterance:\n' +
+      '- "agent": the university counselor / admission helpline who RUNS the call. They ' +
+      'greet on behalf of the university, give step-by-step instructions ("go to the ' +
+      'website", "click on continue application", "login with your application id", "you ' +
+      'will get the fee payment option"), quote fees, ask qualifying questions and confirm ' +
+      'next steps. They say things like "this is the helpline number" and "listen to my ' +
+      'instructions".\n' +
+      '- "customer": the prospective student or parent. They explain their situation ("I ' +
+      'already applied / got the offer letter", "I had not made the payment yet"), ask ' +
+      'questions, report problems and follow the agent\'s instructions.\n' +
+      'METHOD: first decide from the WHOLE conversation which of the two voices is the ' +
+      'agent, then label EVERY line consistently with that single decision. The two roles ' +
+      'never swap identity mid-call, and the same person usually speaks for several ' +
+      'consecutive lines. Respond ONLY with JSON {"speakers": [...]} containing exactly one ' +
+      'value ("agent" or "customer") per line index, in order, with the same number of ' +
+      'entries as the input lines.';
     const user =
       `Call direction: ${direction || 'unknown'} ` +
-      '(outbound = the agent called the student; inbound = the student called in). ' +
-      `Utterances:\n${lines.slice(0, 12000)}`;
+      '(outbound = the agent dialled the student; inbound = the student called the helpline). ' +
+      `${segments.length} lines:\n${lines.slice(0, 16000)}`;
 
     try {
       const res = await this.client.chat.completions.create({
@@ -126,15 +159,20 @@ class AiService {
       const parsed = JSON.parse(res.choices[0].message.content);
       const speakers = Array.isArray(parsed.speakers) ? parsed.speakers : [];
       const fallback = this._heuristicSpeakers(segments, direction);
-      return segments.map((s, i) => ({
+      const labeled = segments.map((s, i) => ({
         ...s,
         speaker: speakers[i] === 'agent' || speakers[i] === 'customer'
           ? speakers[i]
           : fallback[i].speaker,
       }));
+      // Degenerate result (every line one speaker) is not a real 2-party
+      // diarisation — prefer the alternating heuristic in that case.
+      const distinct = new Set(labeled.map((s) => s.speaker));
+      const final = distinct.size < 2 ? fallback : labeled;
+      return this._mergeConsecutiveTurns(final);
     } catch (e) {
       logger.warn(`Diarisation failed, using heuristic: ${e.message}`);
-      return this._heuristicSpeakers(segments, direction);
+      return this._mergeConsecutiveTurns(this._heuristicSpeakers(segments, direction));
     }
   }
 
