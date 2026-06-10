@@ -170,8 +170,8 @@ responds `200 { received: true }` once accepted.
 | GET | `/users` | `users.view` | list; filters `search, role, status`; paginated |
 | GET | `/users/roles` | `users.view` | role list `[{id,name,slug}]` for the form |
 | POST | `/users` | `users.create` | `name, email, role_slug` required; `phone, agent_extension, team_leader_id, status, password?` optional. Sign-in is Google-only, so password is optional (a random one is stored). |
-| PUT | `/users/:id` | `users.update` | `name, phone, role_slug, agent_extension, team_leader_id, status, password?` |
-| DELETE | `/users/:id` | `users.delete` | deactivate (sets `status: inactive`; cannot deactivate self) |
+| PUT | `/users/:id` | `users.update` | `name, phone, role_slug, agent_extension, team_leader_id, status, password?` (deactivate via `status: inactive`) |
+| DELETE | `/users/:id` | `users.delete` | soft-delete the user (paranoid; cannot delete self) |
 
 ## Profile — `/profile`
 | GET `/profile` · PUT `/profile` (`name, phone, avatar_url`) |

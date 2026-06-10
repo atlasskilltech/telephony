@@ -21,8 +21,9 @@ const update = asyncHandler(async (req, res) =>
   success(res, { data: await userService.update(req.params.id, req.body), message: 'User updated' })
 );
 
-const destroy = asyncHandler(async (req, res) =>
-  success(res, { data: await userService.deactivate(req.params.id, req.user), message: 'User deactivated' })
-);
+const destroy = asyncHandler(async (req, res) => {
+  await userService.remove(req.params.id, req.user);
+  return success(res, { message: 'User deleted' });
+});
 
 module.exports = { list, roles, store, update, destroy };

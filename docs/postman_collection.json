@@ -478,7 +478,16 @@
             "body": { "mode": "raw", "raw": "{\n  \"role_slug\": \"team_leader\",\n  \"status\": \"active\"\n}" }
           }
         },
-        { "name": "Deactivate", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/2" } }
+        {
+          "name": "Deactivate (status)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/users/2",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"inactive\"\n}" }
+          }
+        },
+        { "name": "Delete", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/2" } }
       ]
     },
     {
