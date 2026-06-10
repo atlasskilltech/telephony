@@ -83,12 +83,108 @@ window.notifBell = function notifBell() {
   };
 };
 
+// ---- Shared single-call analysis report (used by Calls + Dashboard) ----
+// Spread `...callReportMixin()` into an Alpine component, include the
+// partials/callReport modal, and call `openReport({ id })` to open it.
+window.callReportMixin = function callReportMixin() {
+  const num = (v) => (v == null || v === '' ? null : Number(v));
+  const scoreColor = (s) => (s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#f43f5e');
+  const parse = (v) => {
+    if (typeof v !== 'string') return v;
+    try { return JSON.parse(v); } catch (e) { return null; }
+  };
+  const asArray = (v) => { const p = parse(v); return Array.isArray(p) ? p : []; };
+  const asObj = (v) => { const p = parse(v); return p && typeof p === 'object' && !Array.isArray(p) ? p : {}; };
+  const mmss = (sec) => {
+    if (sec == null) return '';
+    const s = Math.floor(Number(sec) || 0);
+    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  };
+  let arcChart = null; // kept out of reactive state
+  const blankReport = () => ({
+    open: false, loading: false, hasAnalysis: false, a: {},
+    score: 0, scoreColor: '#888', band: '', title: '', subtitle: '',
+    params: [], turns: [], arc: [], positive: [], negative: [], improvements: [],
+    recommendations: [], colorFor: scoreColor,
+  });
+
+  return {
+    report: blankReport(),
+    async openReport(c) {
+      this.report = { ...blankReport(), open: true, loading: true };
+      try {
+        const res = await api.get(`/api/v1/calls/${c.id}`);
+        this.buildReport(res.data);
+      } catch (e) {
+        this.report.loading = false;
+        alert(e.message);
+      }
+    },
+    buildReport(call) {
+      const a = (call && call.analysis) || null;
+      const r = { ...blankReport(), open: true, loading: false };
+      if (!a || a.status !== 'completed') { this.report = r; return; }
+      r.hasAnalysis = true;
+      r.a = a;
+      r.score = Math.round(num(a.call_quality_score) ?? num(a.agent_score) ?? num(a.interest_score) ?? 0);
+      r.scoreColor = scoreColor(r.score);
+      r.band = r.score >= 80 ? 'Strong call — minor coaching'
+        : r.score >= 60 ? 'Good call — some coaching' : 'Needs improvement';
+      const name = call.lead?.student?.first_name || call.to_number || '—';
+      r.title = `Call #${call.id} · ${name}`;
+      r.subtitle = [call.direction, call.status, fmt.duration(call.talk_time_seconds || call.duration_seconds)]
+        .filter(Boolean).join(' · ');
+      r.params = Object.entries(asObj(a.qa_scores)).map(([k, v]) => ({
+        k: k.replace(/_/g, ' '), v: Math.round((Number(v) || 0) * 10),
+      }));
+      const segs = asArray(call.transcript && call.transcript.segments);
+      if (segs.length) {
+        r.turns = segs.map((s) => ({ who: s.speaker, t: mmss(s.start), txt: s.text }));
+      } else if (call.transcript && call.transcript.text) {
+        r.turns = [{ who: 'note', t: '', txt: call.transcript.text }];
+      }
+      r.arc = asArray(a.sentiment_arc).map(Number).filter((n) => !Number.isNaN(n));
+      r.positive = asArray(a.positive_points);
+      const neg = asArray(a.negative_points);
+      r.negative = neg.length ? neg : asArray(a.objections);
+      r.improvements = asArray(a.improvement_suggestions);
+      const recs = asArray(a.recommendations);
+      r.recommendations = recs.length ? recs : (a.followup_recommendation ? [a.followup_recommendation] : []);
+      this.report = r;
+      this.$nextTick(() => this.drawArc());
+    },
+    drawArc() {
+      const el = this.$refs.arc;
+      if (!el || !window.Chart || !this.report.arc.length) return;
+      if (arcChart) { arcChart.destroy(); arcChart = null; }
+      const arc = this.report.arc;
+      arcChart = new Chart(el, {
+        type: 'line',
+        data: {
+          labels: arc.map((_, i) => (i === 0 ? 'start' : i === arc.length - 1 ? 'end' : '')),
+          datasets: [{
+            data: arc, borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.14)',
+            fill: true, tension: 0.4, pointRadius: 3,
+            pointBackgroundColor: (ctx) => (ctx.raw > 0.2 ? '#10b981' : ctx.raw < -0.2 ? '#f43f5e' : '#888'),
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { min: -1, max: 1, ticks: { stepSize: 1, font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } },
+        },
+      });
+    },
+  };
+};
+
 // ---- Call analysis dashboard component ----
 window.dashboardPage = function dashboardPage() {
   // Keep Chart instances OUT of Alpine's reactive state — proxying a Chart (and
   // its canvas) breaks Chart.js internals ("Cannot read ... 'ownerDocument'").
   let charts = {};
   return {
+    ...window.callReportMixin(),
     d: {},
     loading: true,
     metricCards: [],

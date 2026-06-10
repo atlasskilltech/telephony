@@ -93,7 +93,7 @@
   <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 p-5">
     <div class="flex items-center justify-between mb-3">
       <h3 class="font-medium">Recent calls</h3>
-      <span class="text-xs text-slate-400">Click a row to open the calls page</span>
+      <span class="text-xs text-slate-400">Click a row to open the call analysis</span>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -107,7 +107,7 @@
         </thead>
         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
           <template x-for="c in (d.recentCalls||[])" :key="c.id">
-            <tr class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40" @click="window.location.href='/calls'">
+            <tr class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40" @click="openReport(c)">
               <td class="py-2 px-2 font-medium" x-text="'#'+c.id"></td>
               <td class="py-2 px-2" x-text="c.agent"></td>
               <td class="py-2 px-2 capitalize" x-text="c.type || '—'"></td>
@@ -131,4 +131,6 @@
       </table>
     </div>
   </div>
+
+  <%- include('../partials/callReport') %>
 </div>
