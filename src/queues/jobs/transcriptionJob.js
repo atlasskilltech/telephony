@@ -65,10 +65,25 @@ module.exports = async function transcriptionJob(job) {
 
     // Assign Agent vs Student per segment from content + call direction
     // (Whisper provides no speaker labels).
-    const call = await db.CallLog.findByPk(callId, { attributes: ['direction'] });
+    const call = await db.CallLog.findByPk(callId);
     const segments = await aiService.diarizeSegments(result.segments, {
       direction: call ? call.direction : undefined,
     });
+
+    // Reconcile the call length with the real audio duration. Mobile dialers
+    // frequently mis-report duration (e.g. 14s for a 3.5 min recording), so the
+    // measured file length is authoritative. Update the recording always and
+    // the call's duration/talk time when the stored value is clearly off.
+    const measured = result.durationSeconds;
+    if (call && measured && measured > 0) {
+      if (recording.duration_seconds !== measured) {
+        await recording.update({ duration_seconds: measured });
+      }
+      const stored = call.talk_time_seconds || call.duration_seconds || 0;
+      if (Math.abs(measured - stored) > 2) {
+        await call.update({ duration_seconds: measured, talk_time_seconds: measured });
+      }
+    }
 
     await transcript.update({
       language: result.language,
