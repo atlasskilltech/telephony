@@ -153,16 +153,17 @@ paths:
         Mobile flow (no telephony provider): the agent calls from their phone
         and the app uploads the recording here. Stores the audio to S3/local,
         creates the call_logs + call_recordings rows (archived) and runs
-        transcription/analysis. Idempotent on client_call_id.
+        transcription/analysis. Idempotent on client_call_id. The recording file
+        is required for connected calls but optional for missed calls
+        (is_missed=true or status=missed), which are logged without audio.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required: [recording]
               properties:
-                recording: { type: string, format: binary }
+                recording: { type: string, format: binary, description: 'Required for connected calls; optional for missed calls (is_missed=true or status=missed)' }
                 lead_id: { type: integer }
                 to_number: { type: string }
                 from_number: { type: string }

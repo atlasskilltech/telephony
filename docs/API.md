@@ -95,7 +95,7 @@ metadata fields:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `recording` | ✓ | audio file (`mp3, m4a, aac, amr, wav, ogg, opus, webm, 3gp, flac`), ≤ 50 MB |
+| `recording` | ✓ for connected calls | audio file (`mp3, m4a, aac, amr, wav, ogg, opus, webm, 3gp, flac`), ≤ 50 MB. **Not required for missed calls** (`is_missed=true` or `status=missed`) — they are logged without audio |
 | `lead_id` | – | links the call to a lead (its student phone is used if `to_number` omitted) |
 | `to_number` | required if no `lead_id` | number that was dialled |
 | `from_number` | – | defaults to the agent's `phone` / `agent_extension` |
@@ -104,7 +104,7 @@ metadata fields:
 | `duration_seconds` | – | total call seconds (drives the dashboard call-trend) |
 | `talk_time_seconds` | – | billable talk time; defaults to `duration_seconds` |
 | `started_at` / `ended_at` | – | ISO timestamps; `ended_at` derived from `started_at + duration` if omitted |
-| `is_missed` | – | `true`/`false` |
+| `is_missed` | – | `true`/`false`. When `true`, the `recording` file may be omitted and the call is logged with no audio |
 | `client_call_id` | – | client-generated id; makes the upload **idempotent** (safe to retry) |
 
 Auth is the normal `Authorization: Bearer <accessToken>`. The agent is taken

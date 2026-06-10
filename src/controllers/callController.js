@@ -23,7 +23,13 @@ const clickToCall = asyncHandler(async (req, res) => {
 // telephony provider involved — the agent calls from their phone and the
 // app posts the recording here as multipart/form-data ('recording' file).
 const uploadRecording = asyncHandler(async (req, res) => {
-  if (!req.file) throw ApiError.badRequest('No recording file uploaded (field "recording")');
+  // A missed call has no audio to upload, so the recording file is optional
+  // in that case; otherwise it is required.
+  const missed = req.body.is_missed === true || req.body.is_missed === 'true'
+    || req.body.is_missed === '1' || req.body.status === 'missed';
+  if (!req.file && !missed) {
+    throw ApiError.badRequest('No recording file uploaded (field "recording")');
+  }
   const call = await telephonyService.recordMobileCall({
     agent: req.user,
     file: req.file,
