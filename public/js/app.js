@@ -92,10 +92,43 @@ window.dashboardPage = function dashboardPage() {
     d: {},
     loading: true,
     metricCards: [],
+    filters: { range: '30d', from: '', to: '' },
     scoreColor(s) { return s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#f43f5e'; },
     scoreBg(s) { return s >= 80 ? 'rgba(16,185,129,.12)' : s >= 60 ? 'rgba(245,158,11,.12)' : 'rgba(244,63,94,.12)'; },
     async init() {
-      const res = await api.get('/api/v1/dashboard/call-analytics');
+      await this.load();
+    },
+    rangeLabel() {
+      const map = { today: 'today', yesterday: 'yesterday', '7d': 'last 7 days', '30d': 'last 30 days', all: 'all time' };
+      if (this.filters.range === 'custom') {
+        return this.filters.from && this.filters.to ? `${this.filters.from} → ${this.filters.to}` : 'custom range';
+      }
+      return map[this.filters.range] || 'last 30 days';
+    },
+    computeRange() {
+      const now = new Date();
+      const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const endOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+      switch (this.filters.range) {
+        case 'today': return { from: startOf(now), to: now };
+        case 'yesterday': { const y = new Date(now); y.setDate(y.getDate() - 1); return { from: startOf(y), to: endOf(y) }; }
+        case '7d': { const f = new Date(now); f.setDate(f.getDate() - 6); return { from: startOf(f), to: now }; }
+        case 'all': return { all: true };
+        case 'custom': return {
+          from: this.filters.from ? new Date(`${this.filters.from}T00:00:00`) : null,
+          to: this.filters.to ? new Date(`${this.filters.to}T23:59:59`) : null,
+        };
+        default: { const f = new Date(now); f.setDate(f.getDate() - 29); return { from: startOf(f), to: now }; }
+      }
+    },
+    onRangeChange() { if (this.filters.range !== 'custom') this.load(); },
+    async load() {
+      this.loading = true;
+      const r = this.computeRange();
+      const q = new URLSearchParams();
+      if (r.all) { q.set('from', ''); q.set('to', ''); }
+      else { if (r.from) q.set('from', r.from.toISOString()); if (r.to) q.set('to', r.to.toISOString()); }
+      const res = await api.get(`/api/v1/dashboard/call-analytics?${q.toString()}`);
       this.d = res.data || {};
       this.buildCards();
       this.loading = false;
@@ -105,6 +138,7 @@ window.dashboardPage = function dashboardPage() {
       const m = this.d.metrics || {};
       const delta = (x, suffix = '') => {
         const v = (x && x.delta) || 0;
+        if (!v) return '';
         return `${v > 0 ? '+' : ''}${v}${suffix} vs prev`;
       };
       this.metricCards = [
