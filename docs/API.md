@@ -101,8 +101,8 @@ metadata fields:
 | `from_number` | – | defaults to the agent's `phone` / `agent_extension` |
 | `direction` | – | `outbound` (default) or `inbound` |
 | `status` | – | defaults to `completed` |
-| `duration_seconds` | – | total call seconds (drives the dashboard call-trend) |
-| `talk_time_seconds` | – | billable talk time; defaults to `duration_seconds` |
+| `duration_seconds` | – | total call seconds (drives the dashboard call-trend). Reconciled to the real recording length during transcription if the reported value is clearly off |
+| `talk_time_seconds` | – | billable talk time; defaults to `duration_seconds`. Also reconciled to the measured recording length when the reported value is wrong |
 | `started_at` / `ended_at` | – | ISO timestamps; `ended_at` derived from `started_at + duration` if omitted |
 | `is_missed` | – | `true`/`false`. When `true`, the `recording` file may be omitted and the call is logged with no audio |
 | `client_call_id` | – | client-generated id; makes the upload **idempotent** (safe to retry) |

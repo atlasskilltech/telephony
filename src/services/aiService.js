@@ -31,6 +31,7 @@ class AiService {
         text: '[stub] Counselor introduced the program; student asked about fees and hostel.',
         language: 'en',
         segments: [],
+        durationSeconds: null,
         confidence: 0.0,
         model: 'stub',
         processingMs: Date.now() - started,
@@ -53,7 +54,8 @@ class AiService {
           timestamp_granularities: ['segment'],
         });
 
-    const segments = (res.segments || []).map((s, i) => ({
+    const rawSegments = res.segments || [];
+    const segments = rawSegments.map((s, i) => ({
       id: i,
       // Provisional label; refined by diarizeSegments() using content + direction.
       speaker: i % 2 === 0 ? 'agent' : 'customer',
@@ -62,10 +64,17 @@ class AiService {
       text: s.text.trim(),
     }));
 
+    // True audio length straight from the file. verbose_json exposes `duration`;
+    // fall back to the last segment's end time when it's absent. Used to correct
+    // a wrong client-supplied call duration (mobile dialers often mis-report it).
+    const lastEnd = rawSegments.length ? rawSegments[rawSegments.length - 1].end : null;
+    const audioDuration = Number.isFinite(res.duration) ? res.duration : lastEnd;
+
     return {
       text: res.text,
       language: config.ai.translateToEnglish ? 'en' : (res.language || 'en'),
       segments,
+      durationSeconds: Number.isFinite(audioDuration) ? Math.round(audioDuration) : null,
       confidence: this._avgConfidence(res.segments),
       model: config.ai.transcribeModel,
       processingMs: Date.now() - started,
