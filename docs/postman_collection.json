@@ -311,12 +311,12 @@
           "name": "Upload recording (mobile dialer)",
           "request": {
             "method": "POST",
-            "description": "No telephony provider: the agent calls from their phone and the app uploads the recording here. multipart/form-data with the audio in the 'recording' field plus call metadata. Idempotent on client_call_id.",
+            "description": "No telephony provider: the agent calls from their phone and the app uploads the recording here. multipart/form-data with the audio in the 'recording' field plus call metadata. Idempotent on client_call_id. The recording file is required for connected calls but optional when the call is missed (is_missed=true or status=missed).",
             "url": "{{baseUrl}}/calls/upload-recording",
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "recording", "type": "file", "src": "", "description": "audio file: mp3/m4a/aac/amr/wav/ogg/opus/webm/3gp/flac (<=50MB)" },
+                { "key": "recording", "type": "file", "src": "", "description": "audio file: mp3/m4a/aac/amr/wav/ogg/opus/webm/3gp/flac (<=50MB). Required for connected calls; not required for missed calls (is_missed=true or status=missed)." },
                 { "key": "lead_id", "value": "1", "type": "text" },
                 { "key": "to_number", "value": "9876543210", "type": "text", "description": "required if no lead_id" },
                 { "key": "from_number", "value": "", "type": "text", "description": "defaults to the agent phone/extension" },

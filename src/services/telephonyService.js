@@ -86,7 +86,10 @@ class TelephonyService {
     isMissed,
     clientCallId,
   }) {
-    if (!file || !file.buffer || !file.buffer.length) {
+    // A missed call carries no audio, so the recording file is optional there.
+    // For any connected call the recording is still required.
+    const missed = toBool(isMissed) || status === CALL_STATUSES.MISSED;
+    if (!missed && (!file || !file.buffer || !file.buffer.length)) {
       throw ApiError.badRequest('No recording file uploaded');
     }
 
@@ -127,6 +130,8 @@ class TelephonyService {
       },
     });
 
+    const hasRecording = Boolean(file && file.buffer && file.buffer.length);
+
     // Already processed (retry) — return the existing call + recording.
     if (!isNew) {
       const existing = await db.CallRecording.findOne({ where: { call_id: call.id } });
@@ -134,6 +139,20 @@ class TelephonyService {
         call.setDataValue('recording', existing);
         return call;
       }
+      // A missed call has no recording; the idempotent retry just returns it.
+      if (!hasRecording) return call;
+    }
+
+    // Missed call without audio — log it and stop; nothing to archive or transcribe.
+    if (!hasRecording) {
+      await db.ActivityLog.create({
+        user_id: agent.id,
+        subject_type: 'lead',
+        subject_id: lead ? lead.id : 0,
+        action: 'call.recorded',
+        description: `Missed mobile call logged for ${customerNumber}`,
+      });
+      return call;
     }
 
     // Archive the uploaded audio under a date-partitioned key.
