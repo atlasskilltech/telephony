@@ -1,0 +1,121 @@
+<!-- Single-call analysis report modal. Requires the host Alpine component to
+     include callReportMixin() (report state + openReport/buildReport/drawArc). -->
+<div x-show="report.open" x-cloak class="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto" @click.self="report.open=false">
+  <div class="glass bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl my-6 p-5 sm:p-6">
+    <div class="flex items-start justify-between gap-4 mb-5">
+      <h3 class="text-lg font-semibold">Call analysis</h3>
+      <button @click="report.open=false" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">✕</button>
+    </div>
+
+    <template x-if="report.loading">
+      <p class="text-sm text-slate-500 py-10 text-center">Loading report…</p>
+    </template>
+
+    <template x-if="!report.loading && !report.hasAnalysis">
+      <p class="text-sm text-slate-500 py-10 text-center">Analysis is not available for this call yet.</p>
+    </template>
+
+    <template x-if="!report.loading && report.hasAnalysis">
+      <div>
+        <!-- Score + summary -->
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4 mb-4 flex flex-wrap items-start justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div class="w-20 h-20 rounded-full grid place-items-center shrink-0"
+                 :style="`background: conic-gradient(${report.scoreColor} ${report.score*3.6}deg, rgba(148,163,184,.25) 0deg)`">
+              <div class="w-[60px] h-[60px] rounded-full bg-white dark:bg-slate-900 grid place-items-center">
+                <div class="text-center leading-none">
+                  <div class="text-xl font-semibold" x-text="report.score"></div>
+                  <div class="text-[9px] text-slate-500 tracking-wide">SCORE</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="text-xs text-slate-500" x-text="report.title"></div>
+              <div class="text-base font-medium mt-0.5" x-text="report.band"></div>
+              <div class="text-xs text-slate-400 mt-0.5" x-text="report.subtitle"></div>
+            </div>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <span class="px-2.5 py-1 rounded-md text-xs capitalize"
+              :class="report.a.sentiment==='positive' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10' : (report.a.sentiment==='negative' ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')"
+              x-text="report.a.sentiment || 'n/a'"></span>
+            <span x-show="report.a.risk_score!=null" class="px-2.5 py-1 rounded-md text-xs"
+              :class="Number(report.a.risk_score) >= 60 ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10' : 'bg-sky-50 text-sky-600 dark:bg-sky-500/10'"
+              x-text="(Number(report.a.risk_score) >= 60 ? 'High risk · ' : 'Low risk · ') + Math.round(report.a.risk_score) + '%'"></span>
+          </div>
+        </div>
+
+        <!-- Parameter score cards -->
+        <div class="grid gap-3 mb-4" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));">
+          <template x-for="p in report.params" :key="p.k">
+            <div class="rounded-lg bg-slate-50 dark:bg-slate-800 p-3 text-center">
+              <div class="text-xs text-slate-500 capitalize" x-text="p.k"></div>
+              <div class="text-2xl font-semibold mt-1" :style="`color:${report.colorFor(p.v)}`" x-text="p.v"></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Transcript + sentiment arc -->
+        <div class="grid lg:grid-cols-[1.3fr_1fr] gap-4 mb-4">
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+            <div class="text-sm font-medium mb-3">Transcript</div>
+            <div class="max-h-80 overflow-y-auto pr-1 space-y-2.5">
+              <template x-for="(t,ti) in report.turns" :key="ti">
+                <div class="rounded-lg p-2.5 text-[13px] leading-relaxed"
+                     :class="t.who==='agent' ? 'bg-sky-50 dark:bg-sky-500/10' : 'bg-slate-50 dark:bg-slate-800'">
+                  <div class="text-[11px] font-medium text-slate-500 mb-0.5 flex justify-between">
+                    <span x-text="(t.who==='agent'?'Agent':(t.who==='customer'?'Student':'Transcript')) + (t.t ? ' · '+t.t : '')"></span>
+                  </div>
+                  <span x-text="t.txt"></span>
+                </div>
+              </template>
+              <p x-show="!report.turns.length" class="text-sm text-slate-400">Transcript not available.</p>
+            </div>
+          </div>
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+            <div class="text-sm font-medium mb-3">Sentiment arc</div>
+            <div class="relative w-full" style="height:160px;">
+              <canvas x-ref="arc"></canvas>
+            </div>
+            <p x-show="!report.arc.length" class="text-xs text-slate-400">No sentiment arc available.</p>
+            <div x-show="report.a.summary" class="mt-3 text-xs text-slate-500" x-text="report.a.summary"></div>
+          </div>
+        </div>
+
+        <!-- Points grids -->
+        <div class="grid sm:grid-cols-2 gap-4 mb-4">
+          <div class="rounded-xl border border-emerald-200 dark:border-emerald-500/30 p-4">
+            <div class="text-sm font-medium mb-2 text-emerald-600">Positive points</div>
+            <ul class="space-y-1.5 text-[13px]">
+              <template x-for="(x,i) in report.positive" :key="i"><li class="flex gap-2"><span class="text-emerald-500">✓</span><span x-text="x"></span></li></template>
+              <li x-show="!report.positive.length" class="text-slate-400">—</li>
+            </ul>
+          </div>
+          <div class="rounded-xl border border-rose-200 dark:border-rose-500/30 p-4">
+            <div class="text-sm font-medium mb-2 text-rose-600">Negative points</div>
+            <ul class="space-y-1.5 text-[13px]">
+              <template x-for="(x,i) in report.negative" :key="i"><li class="flex gap-2"><span class="text-rose-500">✕</span><span x-text="x"></span></li></template>
+              <li x-show="!report.negative.length" class="text-slate-400">—</li>
+            </ul>
+          </div>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="rounded-xl border border-amber-200 dark:border-amber-500/30 p-4">
+            <div class="text-sm font-medium mb-2 text-amber-600">Could be improved</div>
+            <ul class="space-y-1.5 text-[13px]">
+              <template x-for="(x,i) in report.improvements" :key="i"><li class="flex gap-2"><span class="text-amber-500">!</span><span x-text="x"></span></li></template>
+              <li x-show="!report.improvements.length" class="text-slate-400">—</li>
+            </ul>
+          </div>
+          <div class="rounded-xl border border-sky-200 dark:border-sky-500/30 p-4">
+            <div class="text-sm font-medium mb-2 text-sky-600">Recommendations</div>
+            <ul class="space-y-1.5 text-[13px]">
+              <template x-for="(x,i) in report.recommendations" :key="i"><li class="flex gap-2"><span class="text-sky-500">→</span><span x-text="x"></span></li></template>
+              <li x-show="!report.recommendations.length" class="text-slate-400">—</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>

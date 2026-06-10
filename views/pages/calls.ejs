@@ -121,163 +121,19 @@
     </div>
   </div>
 
-  <!-- Single-call analysis report -->
-  <div x-show="report.open" x-cloak class="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto" @click.self="report.open=false">
-    <div class="glass bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl my-6 p-5 sm:p-6">
-      <!-- Header -->
-      <div class="flex items-start justify-between gap-4 mb-5">
-        <h3 class="text-lg font-semibold">Call analysis</h3>
-        <button @click="report.open=false" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">✕</button>
-      </div>
-
-      <template x-if="report.loading">
-        <p class="text-sm text-slate-500 py-10 text-center">Loading report…</p>
-      </template>
-
-      <template x-if="!report.loading && !report.hasAnalysis">
-        <p class="text-sm text-slate-500 py-10 text-center">Analysis is not available for this call yet.</p>
-      </template>
-
-      <template x-if="!report.loading && report.hasAnalysis">
-        <div>
-          <!-- Score + summary -->
-          <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4 mb-4 flex flex-wrap items-start justify-between gap-4">
-            <div class="flex items-center gap-4">
-              <div class="w-20 h-20 rounded-full grid place-items-center shrink-0"
-                   :style="`background: conic-gradient(${report.scoreColor} ${report.score*3.6}deg, rgba(148,163,184,.25) 0deg)`">
-                <div class="w-[60px] h-[60px] rounded-full bg-white dark:bg-slate-900 grid place-items-center">
-                  <div class="text-center leading-none">
-                    <div class="text-xl font-semibold" x-text="report.score"></div>
-                    <div class="text-[9px] text-slate-500 tracking-wide">SCORE</div>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div class="text-xs text-slate-500" x-text="report.title"></div>
-                <div class="text-base font-medium mt-0.5" x-text="report.band"></div>
-                <div class="text-xs text-slate-400 mt-0.5" x-text="report.subtitle"></div>
-              </div>
-            </div>
-            <div class="flex gap-2 flex-wrap">
-              <span class="px-2.5 py-1 rounded-md text-xs capitalize"
-                :class="report.a.sentiment==='positive' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10' : (report.a.sentiment==='negative' ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')"
-                x-text="report.a.sentiment || 'n/a'"></span>
-              <span x-show="report.a.risk_score!=null" class="px-2.5 py-1 rounded-md text-xs"
-                :class="Number(report.a.risk_score) >= 60 ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10' : 'bg-sky-50 text-sky-600 dark:bg-sky-500/10'"
-                x-text="(Number(report.a.risk_score) >= 60 ? 'High risk · ' : 'Low risk · ') + Math.round(report.a.risk_score) + '%'"></span>
-            </div>
-          </div>
-
-          <!-- Parameter score cards -->
-          <div class="grid gap-3 mb-4" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));">
-            <template x-for="p in report.params" :key="p.k">
-              <div class="rounded-lg bg-slate-50 dark:bg-slate-800 p-3 text-center">
-                <div class="text-xs text-slate-500 capitalize" x-text="p.k"></div>
-                <div class="text-2xl font-semibold mt-1" :style="`color:${report.colorFor(p.v)}`" x-text="p.v"></div>
-              </div>
-            </template>
-          </div>
-
-          <!-- Transcript + sentiment arc -->
-          <div class="grid lg:grid-cols-[1.3fr_1fr] gap-4 mb-4">
-            <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-              <div class="text-sm font-medium mb-3">Transcript</div>
-              <div class="max-h-80 overflow-y-auto pr-1 space-y-2.5">
-                <template x-for="(t,ti) in report.turns" :key="ti">
-                  <div class="rounded-lg p-2.5 text-[13px] leading-relaxed"
-                       :class="t.who==='agent' ? 'bg-sky-50 dark:bg-sky-500/10' : 'bg-slate-50 dark:bg-slate-800'">
-                    <div class="text-[11px] font-medium text-slate-500 mb-0.5 flex justify-between">
-                      <span x-text="(t.who==='agent'?'Counselor':(t.who==='customer'?'Student':'Transcript')) + (t.t ? ' · '+t.t : '')"></span>
-                    </div>
-                    <span x-text="t.txt"></span>
-                  </div>
-                </template>
-                <p x-show="!report.turns.length" class="text-sm text-slate-400">Transcript not available.</p>
-              </div>
-            </div>
-            <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-              <div class="text-sm font-medium mb-3">Sentiment arc</div>
-              <div class="relative w-full" style="height:160px;">
-                <canvas x-ref="arc"></canvas>
-              </div>
-              <p x-show="!report.arc.length" class="text-xs text-slate-400">No sentiment arc available.</p>
-              <div x-show="report.a.summary" class="mt-3 text-xs text-slate-500" x-text="report.a.summary"></div>
-            </div>
-          </div>
-
-          <!-- Points grids -->
-          <div class="grid sm:grid-cols-2 gap-4 mb-4">
-            <div class="rounded-xl border border-emerald-200 dark:border-emerald-500/30 p-4">
-              <div class="text-sm font-medium mb-2 text-emerald-600">Positive points</div>
-              <ul class="space-y-1.5 text-[13px]">
-                <template x-for="(x,i) in report.positive" :key="i"><li class="flex gap-2"><span class="text-emerald-500">✓</span><span x-text="x"></span></li></template>
-                <li x-show="!report.positive.length" class="text-slate-400">—</li>
-              </ul>
-            </div>
-            <div class="rounded-xl border border-rose-200 dark:border-rose-500/30 p-4">
-              <div class="text-sm font-medium mb-2 text-rose-600">Negative points</div>
-              <ul class="space-y-1.5 text-[13px]">
-                <template x-for="(x,i) in report.negative" :key="i"><li class="flex gap-2"><span class="text-rose-500">✕</span><span x-text="x"></span></li></template>
-                <li x-show="!report.negative.length" class="text-slate-400">—</li>
-              </ul>
-            </div>
-          </div>
-          <div class="grid sm:grid-cols-2 gap-4">
-            <div class="rounded-xl border border-amber-200 dark:border-amber-500/30 p-4">
-              <div class="text-sm font-medium mb-2 text-amber-600">Could be improved</div>
-              <ul class="space-y-1.5 text-[13px]">
-                <template x-for="(x,i) in report.improvements" :key="i"><li class="flex gap-2"><span class="text-amber-500">!</span><span x-text="x"></span></li></template>
-                <li x-show="!report.improvements.length" class="text-slate-400">—</li>
-              </ul>
-            </div>
-            <div class="rounded-xl border border-sky-200 dark:border-sky-500/30 p-4">
-              <div class="text-sm font-medium mb-2 text-sky-600">Recommendations</div>
-              <ul class="space-y-1.5 text-[13px]">
-                <template x-for="(x,i) in report.recommendations" :key="i"><li class="flex gap-2"><span class="text-sky-500">→</span><span x-text="x"></span></li></template>
-                <li x-show="!report.recommendations.length" class="text-slate-400">—</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </template>
-    </div>
-  </div>
+  <%- include('../partials/callReport') %>
 </div>
 <script>
   window.callsPage = function () {
-    const num = (v) => (v == null || v === '' ? null : Number(v));
-    const scoreColor = (s) => (s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : '#f43f5e');
-    // JSON columns can come back parsed (array/object) or as a raw JSON string
-    // depending on the DB/driver — coerce defensively before using them.
-    const parse = (v) => {
-      if (typeof v !== 'string') return v;
-      try { return JSON.parse(v); } catch (e) { return null; }
-    };
-    const asArray = (v) => { const p = parse(v); return Array.isArray(p) ? p : []; };
-    const asObj = (v) => { const p = parse(v); return p && typeof p === 'object' && !Array.isArray(p) ? p : {}; };
-    const mmss = (sec) => {
-      if (sec == null) return '';
-      const s = Math.floor(Number(sec) || 0);
-      return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-    };
-    // Held outside reactive state — proxying a Chart breaks Chart.js internals.
-    let arcChart = null;
-    const blankReport = () => ({
-      open: false, loading: false, hasAnalysis: false, a: {},
-      score: 0, scoreColor: '#888', band: '', title: '', subtitle: '',
-      params: [], turns: [], arc: [], positive: [], negative: [], improvements: [],
-      recommendations: [], colorFor: scoreColor,
-    });
-
     const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const endOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
     return {
+      ...window.callReportMixin(),
       calls: [], loading: true, audioUrl: '', playingId: null,
       meta: {}, page: 1, limit: 20,
       filters: { range: 'today', from: '', to: '', agentId: '', search: '' },
       agents: [],
-      report: blankReport(),
       retrying: {},
       async init() {
         await this.load();
@@ -303,7 +159,7 @@
               from: this.filters.from ? new Date(`${this.filters.from}T00:00:00`) : null,
               to: this.filters.to ? new Date(`${this.filters.to}T23:59:59`) : null,
             };
-          default: // today
+          default:
             return { from: startOfDay(now), to: now };
         }
       },
@@ -336,78 +192,7 @@
         this.page = (this.meta.page || 1) + 1;
         this.load();
       },
-      async openReport(c) {
-        this.report = { ...blankReport(), open: true, loading: true };
-        try {
-          const res = await api.get(`/api/v1/calls/${c.id}`);
-          this.buildReport(res.data);
-        } catch (e) {
-          this.report.loading = false;
-          alert(e.message);
-        }
-      },
-      buildReport(call) {
-        const a = (call && call.analysis) || null;
-        const r = { ...blankReport(), open: true, loading: false };
-        if (!a || a.status !== 'completed') {
-          this.report = r;
-          return;
-        }
-        r.hasAnalysis = true;
-        r.a = a;
-        r.score = Math.round(num(a.call_quality_score) ?? num(a.agent_score) ?? num(a.interest_score) ?? 0);
-        r.scoreColor = scoreColor(r.score);
-        r.band = r.score >= 80 ? 'Strong call — minor coaching'
-          : r.score >= 60 ? 'Good call — some coaching' : 'Needs improvement';
-        const name = call.lead?.student?.first_name || call.to_number || '—';
-        r.title = `Call #${call.id} · ${name}`;
-        r.subtitle = [call.direction, call.status, fmt.duration(call.talk_time_seconds || call.duration_seconds)]
-          .filter(Boolean).join(' · ');
-        // Parameter scores (qa_scores are 0-10 -> show 0-100).
-        r.params = Object.entries(asObj(a.qa_scores)).map(([k, v]) => ({
-          k: k.replace(/_/g, ' '), v: Math.round((Number(v) || 0) * 10),
-        }));
-        // Transcript turns from diarised segments, else the raw text.
-        const segs = asArray(call.transcript && call.transcript.segments);
-        if (segs.length) {
-          r.turns = segs.map((s) => ({ who: s.speaker, t: mmss(s.start), txt: s.text }));
-        } else if (call.transcript && call.transcript.text) {
-          r.turns = [{ who: 'note', t: '', txt: call.transcript.text }];
-        }
-        r.arc = asArray(a.sentiment_arc).map(Number).filter((n) => !Number.isNaN(n));
-        r.positive = asArray(a.positive_points);
-        const neg = asArray(a.negative_points);
-        r.negative = neg.length ? neg : asArray(a.objections);
-        r.improvements = asArray(a.improvement_suggestions);
-        const recs = asArray(a.recommendations);
-        r.recommendations = recs.length ? recs : (a.followup_recommendation ? [a.followup_recommendation] : []);
-        this.report = r;
-        this.$nextTick(() => this.drawArc());
-      },
-      drawArc() {
-        const el = this.$refs.arc;
-        if (!el || !window.Chart || !this.report.arc.length) return;
-        if (arcChart) { arcChart.destroy(); arcChart = null; }
-        const arc = this.report.arc;
-        arcChart = new Chart(el, {
-          type: 'line',
-          data: {
-            labels: arc.map((_, i) => (i === 0 ? 'start' : i === arc.length - 1 ? 'end' : '')),
-            datasets: [{
-              data: arc, borderColor: '#378ADD', backgroundColor: 'rgba(55,138,221,0.14)',
-              fill: true, tension: 0.4, pointRadius: 3,
-              pointBackgroundColor: (ctx) => (ctx.raw > 0.2 ? '#10b981' : ctx.raw < -0.2 ? '#f43f5e' : '#888'),
-            }],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { min: -1, max: 1, ticks: { stepSize: 1, font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } },
-          },
-        });
-      },
       async play(c) {
-        // Toggle: clicking the playing row stops/closes the inline player.
         if (this.playingId === c.id) { this.playingId = null; this.audioUrl = ''; return; }
         try {
           const res = await api.get(`/api/v1/calls/${c.id}/recording-url`);
@@ -419,7 +204,6 @@
         this.retrying[c.id] = true;
         try {
           await api.post(`/api/v1/calls/${c.id}/retry-transcription`);
-          // Give the worker a few seconds, then refresh the list and clear the spinner.
           setTimeout(async () => {
             try { await this.init(); } finally { this.retrying[c.id] = false; }
           }, 6000);
