@@ -66,7 +66,7 @@ const config = {
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret',
-    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '1d',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
     sessionSecret: process.env.SESSION_SECRET || 'dev_session_secret',
     bcryptRounds: toInt(process.env.BCRYPT_ROUNDS, 12),
