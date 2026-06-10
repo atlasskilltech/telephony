@@ -111,6 +111,15 @@ class UserService {
     await user.update({ status: 'inactive' });
     return this.findById(id);
   }
+
+  /** Soft-delete the user row (paranoid). Sign-in and lists exclude them. */
+  async remove(id, actor) {
+    const user = await db.User.findByPk(id);
+    if (!user) throw ApiError.notFound('User not found');
+    if (actor && actor.id === user.id) throw ApiError.badRequest('You cannot delete yourself');
+    await user.destroy();
+    return true;
+  }
 }
 
 module.exports = new UserService();

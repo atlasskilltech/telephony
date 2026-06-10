@@ -171,14 +171,17 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/leads?page=1&limit=20&search=&pipeline_stage=",
+              "raw": "{{baseUrl}}/leads?page=1&limit=20&search=&pipeline_stage=&assigned_to=&called=&min_interest=",
               "host": ["{{baseUrl}}"],
               "path": ["leads"],
               "query": [
                 { "key": "page", "value": "1" },
                 { "key": "limit", "value": "20" },
-                { "key": "search", "value": "" },
-                { "key": "pipeline_stage", "value": "" }
+                { "key": "search", "value": "", "description": "name or phone" },
+                { "key": "pipeline_stage", "value": "" },
+                { "key": "assigned_to", "value": "", "description": "agent user id" },
+                { "key": "called", "value": "", "description": "true=Called, false=New Data" },
+                { "key": "min_interest", "value": "", "description": "AI interest >= n (e.g. 50)" }
               ]
             }
           }
@@ -281,19 +284,25 @@
           "name": "List",
           "request": {
             "method": "GET",
+            "description": "Defaults to today's calls when from/to omitted. Filter by agent_id, status, lead_id, search (lead name/number) and from/to (ISO).",
             "url": {
-              "raw": "{{baseUrl}}/calls?page=1&limit=20&lead_id=&status=",
+              "raw": "{{baseUrl}}/calls?page=1&limit=20&search=&agent_id=&status=&from=&to=",
               "host": ["{{baseUrl}}"],
               "path": ["calls"],
               "query": [
                 { "key": "page", "value": "1" },
                 { "key": "limit", "value": "20" },
-                { "key": "lead_id", "value": "" },
-                { "key": "status", "value": "" }
+                { "key": "search", "value": "", "description": "lead name or number" },
+                { "key": "agent_id", "value": "" },
+                { "key": "status", "value": "" },
+                { "key": "lead_id", "value": "", "disabled": true },
+                { "key": "from", "value": "", "description": "ISO datetime; defaults to start of today" },
+                { "key": "to", "value": "", "description": "ISO datetime; defaults to now" }
               ]
             }
           }
         },
+        { "name": "Agents (filter)", "request": { "method": "GET", "url": "{{baseUrl}}/calls/agents" } },
         {
           "name": "Upload recording (mobile dialer)",
           "request": {
@@ -478,7 +487,16 @@
             "body": { "mode": "raw", "raw": "{\n  \"role_slug\": \"team_leader\",\n  \"status\": \"active\"\n}" }
           }
         },
-        { "name": "Deactivate", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/2" } }
+        {
+          "name": "Deactivate (status)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/users/2",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"inactive\"\n}" }
+          }
+        },
+        { "name": "Delete", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/2" } }
       ]
     },
     {

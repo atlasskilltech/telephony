@@ -61,7 +61,7 @@ endpoint remains for API clients / admin break-glass but is not shown in the UI.
 ## Leads — `/leads`
 | Method | Path | Permission | Notes |
 |--------|------|-----------|-------|
-| GET | `/leads` | `leads.view` | filters: `search, course, city, source_id, status_id, assigned_to, pipeline_stage, priority, from, to` |
+| GET | `/leads` | `leads.view` | filters: `search` (name/phone), `assigned_to` (agent), `pipeline_stage`, `called` (`true`=Called / `false`=New Data), `min_interest` (AI interest ≥ n%), `course, city, source_id, status_id, priority, from, to` |
 | POST | `/leads` | `leads.create` | `first_name, phone` required; `auto_assign, strategy` optional |
 | GET | `/leads/:id` | `leads.view` | full lead incl. followups & calls |
 | PUT | `/leads/:id` | `leads.update` | |
@@ -80,7 +80,8 @@ endpoint remains for API clients / admin break-glass but is not shown in the UI.
 |--------|------|-----------|-------|
 | POST | `/calls/upload-recording` | `calls.create` | **mobile dialer** — multipart upload of a recorded call (see below) |
 | POST | `/calls/click-to-call` | `calls.create` | `lead_id` and/or `to_number` (one required) — only if a cloud provider is configured |
-| GET | `/calls` | `calls.view` | filters `lead_id, status`; paginated. Counselors see only their own calls |
+| GET | `/calls` | `calls.view` | filters `agent_id, lead_id, status, search` (lead name/number) and `from, to` (ISO; **defaults to today**); paginated. Counselors see only their own calls |
+| GET | `/calls/agents` | `calls.view` | active agents `[{id,name}]` for the agent filter |
 | GET | `/calls/:id` | `calls.view` | full call incl. `recording`, `transcript`, `analysis`, `lead` |
 | POST | `/calls/:id/retry-transcription` | `calls.create` | re-queue transcription + analysis for the stored recording (no re-upload) |
 | GET | `/calls/:id/recording-url` | `calls.recording.view` | time-limited URL to the archived recording |
@@ -170,8 +171,8 @@ responds `200 { received: true }` once accepted.
 | GET | `/users` | `users.view` | list; filters `search, role, status`; paginated |
 | GET | `/users/roles` | `users.view` | role list `[{id,name,slug}]` for the form |
 | POST | `/users` | `users.create` | `name, email, role_slug` required; `phone, agent_extension, team_leader_id, status, password?` optional. Sign-in is Google-only, so password is optional (a random one is stored). |
-| PUT | `/users/:id` | `users.update` | `name, phone, role_slug, agent_extension, team_leader_id, status, password?` |
-| DELETE | `/users/:id` | `users.delete` | deactivate (sets `status: inactive`; cannot deactivate self) |
+| PUT | `/users/:id` | `users.update` | `name, phone, role_slug, agent_extension, team_leader_id, status, password?` (deactivate via `status: inactive`) |
+| DELETE | `/users/:id` | `users.delete` | soft-delete the user (paranoid; cannot delete self) |
 
 ## Profile — `/profile`
 | GET `/profile` · PUT `/profile` (`name, phone, avatar_url`) |

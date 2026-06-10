@@ -22,6 +22,7 @@ const upload = multer({
 });
 
 router.get('/', requirePermission('calls.view'), callController.list);
+router.get('/agents', requirePermission('calls.view'), callController.agents);
 router.post('/click-to-call', requirePermission('calls.create'), callController.clickToCall);
 router.post(
   '/upload-recording',

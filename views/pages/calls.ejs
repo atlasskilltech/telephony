@@ -1,4 +1,33 @@
 <div x-data="callsPage()" x-init="init()">
+  <!-- Filters -->
+  <div class="flex flex-wrap items-end gap-3 mb-4">
+    <div class="relative flex-1 min-w-[200px]">
+      <input x-model="filters.search" @input.debounce.400ms="apply()" placeholder="Search lead name or number…"
+        class="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none focus:border-indigo-400" />
+      <svg class="w-5 h-5 absolute left-3 top-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+    </div>
+    <select x-model="filters.range" @change="onRangeChange()"
+      class="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none">
+      <option value="today">Today</option>
+      <option value="yesterday">Yesterday</option>
+      <option value="7d">Last 7 days</option>
+      <option value="30d">Last 30 days</option>
+      <option value="custom">Custom…</option>
+    </select>
+    <template x-if="filters.range==='custom'">
+      <div class="flex items-center gap-2">
+        <input type="date" x-model="filters.from" @change="apply()" class="px-3 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none" />
+        <span class="text-slate-400">–</span>
+        <input type="date" x-model="filters.to" @change="apply()" class="px-3 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none" />
+      </div>
+    </template>
+    <select x-show="agents.length" x-model="filters.agentId" @change="apply()"
+      class="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none">
+      <option value="">All agents</option>
+      <template x-for="a in agents" :key="a.id"><option :value="a.id" x-text="a.name"></option></template>
+    </select>
+  </div>
+
   <div class="glass rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -6,6 +35,7 @@
           <tr>
             <th class="px-4 py-3 font-medium">When</th>
             <th class="px-4 py-3 font-medium">Lead</th>
+            <th class="px-4 py-3 font-medium">Agent</th>
             <th class="px-4 py-3 font-medium">Direction</th>
             <th class="px-4 py-3 font-medium">Status</th>
             <th class="px-4 py-3 font-medium">Duration</th>
@@ -21,6 +51,7 @@
                 <div class="font-medium" x-text="c.lead?.student?.first_name || c.to_number"></div>
                 <div class="text-xs text-slate-400" x-show="c.lead?.student?.first_name" x-text="c.to_number"></div>
               </td>
+              <td class="px-4 py-3" x-text="c.agent?.name || '—'"></td>
               <td class="px-4 py-3 capitalize">
                 <span class="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300">
                   <span x-text="c.direction==='inbound' ? '↙' : '↗'"></span><span x-text="c.direction"></span>
@@ -64,7 +95,7 @@
             </tr>
             <template x-if="playingId===c.id">
               <tr>
-                <td colspan="7" class="px-4 pb-3 bg-slate-50/70 dark:bg-slate-800/30">
+                <td colspan="8" class="px-4 pb-3 bg-slate-50/70 dark:bg-slate-800/30">
                   <audio controls autoplay class="w-full h-9" :src="audioUrl"></audio>
                 </td>
               </tr>
@@ -72,10 +103,10 @@
           </tbody>
         </template>
         <tbody x-show="loading">
-          <tr><td colspan="7" class="px-4 py-12 text-center text-slate-500">Loading…</td></tr>
+          <tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Loading…</td></tr>
         </tbody>
         <tbody x-show="!loading && calls.length===0">
-          <tr><td colspan="7" class="px-4 py-12 text-center text-slate-500">No calls yet</td></tr>
+          <tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">No calls yet</td></tr>
         </tbody>
       </table>
     </div>
@@ -238,21 +269,62 @@
       recommendations: [], colorFor: scoreColor,
     });
 
+    const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const endOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
     return {
       calls: [], loading: true, audioUrl: '', playingId: null,
       meta: {}, page: 1, limit: 20,
+      filters: { range: 'today', from: '', to: '', agentId: '', search: '' },
+      agents: [],
       report: blankReport(),
       retrying: {},
       async init() {
         await this.load();
+        this.loadAgents();
       },
+      computeRange() {
+        const now = new Date();
+        switch (this.filters.range) {
+          case 'yesterday': {
+            const y = new Date(now); y.setDate(y.getDate() - 1);
+            return { from: startOfDay(y), to: endOfDay(y) };
+          }
+          case '7d': {
+            const f = new Date(now); f.setDate(f.getDate() - 6);
+            return { from: startOfDay(f), to: now };
+          }
+          case '30d': {
+            const f = new Date(now); f.setDate(f.getDate() - 29);
+            return { from: startOfDay(f), to: now };
+          }
+          case 'custom':
+            return {
+              from: this.filters.from ? new Date(`${this.filters.from}T00:00:00`) : null,
+              to: this.filters.to ? new Date(`${this.filters.to}T23:59:59`) : null,
+            };
+          default: // today
+            return { from: startOfDay(now), to: now };
+        }
+      },
+      onRangeChange() { if (this.filters.range !== 'custom') this.apply(); },
+      apply() { this.page = 1; this.load(); },
       async load() {
         this.loading = true;
         this.playingId = null;
-        const res = await api.get(`/api/v1/calls?page=${this.page}&limit=${this.limit}`);
+        const { from, to } = this.computeRange();
+        const q = new URLSearchParams({ page: this.page, limit: this.limit });
+        if (from) q.set('from', from.toISOString());
+        if (to) q.set('to', to.toISOString());
+        if (this.filters.agentId) q.set('agent_id', this.filters.agentId);
+        if (this.filters.search) q.set('search', this.filters.search);
+        const res = await api.get(`/api/v1/calls?${q.toString()}`);
         this.calls = res.data || [];
         this.meta = res.meta || {};
         this.loading = false;
+      },
+      async loadAgents() {
+        try { this.agents = (await api.get('/api/v1/calls/agents')).data || []; } catch (e) { this.agents = []; }
       },
       prev() {
         if ((this.meta.page || 1) <= 1) return;

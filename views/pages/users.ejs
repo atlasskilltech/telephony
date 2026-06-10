@@ -35,10 +35,20 @@
                   x-text="u.status"></span>
               </td>
               <td class="px-4 py-3 text-right">
-                <button x-show="u.status==='active'" @click="deactivate(u)"
-                  class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Deactivate</button>
-                <button x-show="u.status!=='active'" @click="reactivate(u)"
-                  class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Reactivate</button>
+                <div class="inline-flex items-center gap-1">
+                  <button @click="openEdit(u)" title="Edit" class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                  <button x-show="u.status==='active'" @click="deactivate(u)" title="Deactivate" class="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                  </button>
+                  <button x-show="u.status!=='active'" @click="reactivate(u)" title="Reactivate" class="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  </button>
+                  <button @click="remove(u)" title="Delete" class="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
               </td>
             </tr>
           </template>
@@ -59,23 +69,29 @@
   <!-- Create modal -->
   <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="showCreate=false">
     <div class="glass bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6">
-      <h3 class="text-lg font-semibold mb-4">New user</h3>
+      <h3 class="text-lg font-semibold mb-4" x-text="editId ? 'Edit user' : 'New user'"></h3>
       <p x-show="error" x-text="error" class="mb-3 text-sm text-rose-500"></p>
       <div class="space-y-3">
         <input x-model="form.name" placeholder="Full name *" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none" />
-        <input x-model="form.email" type="email" placeholder="Email * (Google sign-in)" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none" />
+        <input x-model="form.email" type="email" placeholder="Email * (Google sign-in)" :disabled="!!editId"
+          class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none disabled:opacity-60 disabled:cursor-not-allowed" />
         <input x-model="form.phone" placeholder="Phone" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none" />
         <select x-model="form.role_slug" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none">
           <option value="">Select role *</option>
           <template x-for="r in roles" :key="r.id"><option :value="r.slug" x-text="r.name"></option></template>
         </select>
         <input x-model="form.agent_extension" placeholder="Agent extension (optional)" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none" />
+        <select x-show="editId" x-model="form.status" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="suspended">Suspended</option>
+        </select>
       </div>
       <div class="flex justify-end gap-2 mt-5">
         <button @click="showCreate=false" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Cancel</button>
-        <button @click="create()" :disabled="saving" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50">Create</button>
+        <button @click="save()" :disabled="saving" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50" x-text="editId ? 'Save' : 'Create'"></button>
       </div>
-      <p class="text-xs text-slate-500 mt-4">The user signs in with Google using this email — no password needed.</p>
+      <p x-show="!editId" class="text-xs text-slate-500 mt-4">The user signs in with Google using this email — no password needed.</p>
     </div>
   </div>
 </div>
@@ -83,8 +99,8 @@
   window.usersPage = function () {
     return {
       users: [], roles: [], meta: {}, page: 1, loading: true,
-      search: '', showCreate: false, saving: false, error: '',
-      form: { name: '', email: '', phone: '', role_slug: '', agent_extension: '' },
+      search: '', showCreate: false, saving: false, error: '', editId: null,
+      form: { name: '', email: '', phone: '', role_slug: '', agent_extension: '', status: 'active' },
       async init() {
         await Promise.all([this.load(), this.loadRoles()]);
       },
@@ -104,28 +120,56 @@
       next() { if ((this.meta.page || 1) < (this.meta.totalPages || 1)) { this.page = this.meta.page + 1; this.load(); } },
       openCreate() {
         this.error = '';
-        this.form = { name: '', email: '', phone: '', role_slug: '', agent_extension: '' };
+        this.editId = null;
+        this.form = { name: '', email: '', phone: '', role_slug: '', agent_extension: '', status: 'active' };
         this.showCreate = true;
       },
-      async create() {
+      openEdit(u) {
+        this.error = '';
+        this.editId = u.id;
+        this.form = {
+          name: u.name || '',
+          email: u.email || '',
+          phone: u.phone || '',
+          role_slug: u.role ? u.role.slug : '',
+          agent_extension: u.agent_extension || '',
+          status: u.status || 'active',
+        };
+        this.showCreate = true;
+      },
+      async save() {
         this.error = '';
         if (!this.form.name || !this.form.email || !this.form.role_slug) {
           this.error = 'Name, email and role are required'; return;
         }
         this.saving = true;
         try {
-          await api.post('/api/v1/users', this.form);
+          if (this.editId) {
+            await api.put(`/api/v1/users/${this.editId}`, {
+              name: this.form.name,
+              phone: this.form.phone,
+              role_slug: this.form.role_slug,
+              agent_extension: this.form.agent_extension,
+              status: this.form.status,
+            });
+          } else {
+            await api.post('/api/v1/users', this.form);
+            this.page = 1;
+          }
           this.showCreate = false;
-          this.page = 1;
           await this.load();
         } catch (e) { this.error = e.message; } finally { this.saving = false; }
       },
       async deactivate(u) {
         if (!confirm(`Deactivate ${u.name}? They will no longer be able to sign in.`)) return;
-        try { await api.del(`/api/v1/users/${u.id}`); await this.load(); } catch (e) { alert(e.message); }
+        try { await api.put(`/api/v1/users/${u.id}`, { status: 'inactive' }); await this.load(); } catch (e) { alert(e.message); }
       },
       async reactivate(u) {
         try { await api.put(`/api/v1/users/${u.id}`, { status: 'active' }); await this.load(); } catch (e) { alert(e.message); }
+      },
+      async remove(u) {
+        if (!confirm(`Delete ${u.name}? This removes the user account.`)) return;
+        try { await api.del(`/api/v1/users/${u.id}`); await this.load(); } catch (e) { alert(e.message); }
       },
     };
   };

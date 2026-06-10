@@ -2,7 +2,7 @@
   <!-- Toolbar -->
   <div class="flex flex-wrap items-center gap-3 mb-4">
     <div class="relative flex-1 min-w-[200px]">
-      <input x-model="filters.search" @input.debounce.400ms="filters.page=1; load()" placeholder="Search name, phone, email…"
+      <input x-model="filters.search" @input.debounce.400ms="filters.page=1; load()" placeholder="Search name or phone…"
         class="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none focus:border-indigo-400" />
       <svg class="w-5 h-5 absolute left-3 top-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
     </div>
@@ -13,6 +13,25 @@
         <option value="<%= s %>"><%= s.replace(/_/g,' ') %></option>
       <% }); %>
     </select>
+    <select x-show="assignees.length" x-model="filters.assigned_to" @change="filters.page=1; load()"
+      class="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none">
+      <option value="">All agents</option>
+      <template x-for="a in assignees" :key="a.id"><option :value="a.id" x-text="a.name"></option></template>
+    </select>
+    <select x-model="filters.called" @change="filters.page=1; load()"
+      class="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none">
+      <option value="">All actions</option>
+      <option value="false">New Data</option>
+      <option value="true">Called</option>
+    </select>
+    <select x-model="filters.min_interest" @change="filters.page=1; load()"
+      class="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none">
+      <option value="">Any AI interest</option>
+      <option value="75">&gt; 75%</option>
+      <option value="50">&gt; 50%</option>
+      <option value="25">&gt; 25%</option>
+      <option value="10">&gt; 10%</option>
+    </select>
     <button @click="openImport()" class="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">Import CSV</button>
     <button @click="showCreate = true" class="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium">+ New Lead</button>
   </div>
@@ -21,7 +40,7 @@
   <div x-show="assignees.length" class="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
     <span class="text-sm text-slate-500" x-text="selectedCount() + ' selected'"></span>
     <select x-model="assignTo" class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none text-sm">
-      <option value="">Assign to counselor…</option>
+      <option value="">Assign to agent…</option>
       <template x-for="a in assignees" :key="a.id"><option :value="a.id" x-text="a.name"></option></template>
     </select>
     <button @click="assignSelected()" :disabled="!assignTo || !selectedCount() || assigning"
@@ -41,9 +60,9 @@
             <th class="px-4 py-3 font-medium">Lead</th>
             <th class="px-4 py-3 font-medium">Course</th>
             <th class="px-4 py-3 font-medium">Stage</th>
-            <th class="px-4 py-3 font-medium">Counselor</th>
+            <th class="px-4 py-3 font-medium">Agent</th>
             <th class="px-4 py-3 font-medium">AI Interest</th>
-            <th class="px-4 py-3 font-medium text-right">Actions</th>
+            <th class="px-4 py-3 font-medium text-right">Action</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -62,7 +81,9 @@
                 <span x-show="!lead.ai_interest_score" class="text-slate-400">—</span>
               </td>
               <td class="px-4 py-3 text-right">
-                <button @click="call(lead)" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs">Call</button>
+                <span class="px-2.5 py-1 rounded-md text-xs font-medium"
+                  :class="lead.last_contacted_at ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'"
+                  x-text="lead.last_contacted_at ? 'Called' : 'New Data'"></span>
               </td>
             </tr>
           </template>

@@ -163,7 +163,7 @@ window.leadsPage = function leadsPage() {
   return {
     leads: [],
     meta: {},
-    filters: { search: '', pipeline_stage: '', page: 1 },
+    filters: { search: '', pipeline_stage: '', assigned_to: '', called: '', min_interest: '', page: 1 },
     loading: true,
     showCreate: false,
     form: { first_name: '', phone: '', email: '', course: '', city: '' },
