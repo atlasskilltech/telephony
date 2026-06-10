@@ -55,7 +55,7 @@ class AiService {
 
     const segments = (res.segments || []).map((s, i) => ({
       id: i,
-      // Heuristic speaker labelling; replace with a diarisation model if needed.
+      // Provisional label; refined by diarizeSegments() using content + direction.
       speaker: i % 2 === 0 ? 'agent' : 'customer',
       start: s.start,
       end: s.end,
@@ -77,6 +77,65 @@ class AiService {
     // Whisper exposes avg_logprob per segment; map to a rough 0-1 confidence.
     const vals = segments.map((s) => Math.exp(s.avg_logprob ?? -1));
     return Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(4));
+  }
+
+  /** Direction-aware fallback when AI diarisation is unavailable. */
+  _heuristicSpeakers(segments = [], direction) {
+    // Outbound/unknown: the agent typically speaks first; inbound: the student.
+    const agentFirst = direction !== 'inbound';
+    return segments.map((s, i) => ({
+      ...s,
+      speaker: (i % 2 === 0) === agentFirst ? 'agent' : 'customer',
+    }));
+  }
+
+  /**
+   * Assign each transcript segment to the agent (university counselor) or the
+   * customer (student) using conversational cues and the call direction.
+   * Whisper has no speaker info, so this is content-based diarisation; falls
+   * back to a direction-aware heuristic when AI is off or the call fails.
+   */
+  async diarizeSegments(segments = [], { direction } = {}) {
+    if (!segments.length) return segments;
+    if (!this.enabled) return this._heuristicSpeakers(segments, direction);
+
+    const lines = segments.map((s, i) => `${i}: ${s.text}`).join('\n');
+    const system =
+      'You label each utterance in an admission/sales phone call as the speaker: ' +
+      '"agent" (the university counselor who handles admissions/fees/process) or ' +
+      '"customer" (the prospective student/parent enquiring). Use conversational ' +
+      'cues — the agent guides the process, quotes fees, asks qualifying questions; ' +
+      'the customer asks about programs, reports problems, gives personal choices. ' +
+      'Respond ONLY with JSON {"speakers": [...]} of exactly one value ("agent" or ' +
+      '"customer") per line index, in order.';
+    const user =
+      `Call direction: ${direction || 'unknown'} ` +
+      '(outbound = the agent called the student; inbound = the student called in). ' +
+      `Utterances:\n${lines.slice(0, 12000)}`;
+
+    try {
+      const res = await this.client.chat.completions.create({
+        model: config.ai.analysisModel,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+      });
+      const parsed = JSON.parse(res.choices[0].message.content);
+      const speakers = Array.isArray(parsed.speakers) ? parsed.speakers : [];
+      const fallback = this._heuristicSpeakers(segments, direction);
+      return segments.map((s, i) => ({
+        ...s,
+        speaker: speakers[i] === 'agent' || speakers[i] === 'customer'
+          ? speakers[i]
+          : fallback[i].speaker,
+      }));
+    } catch (e) {
+      logger.warn(`Diarisation failed, using heuristic: ${e.message}`);
+      return this._heuristicSpeakers(segments, direction);
+    }
   }
 
   /**
