@@ -1,5 +1,6 @@
 'use strict';
 
+const { Op } = require('sequelize');
 const telephonyService = require('../services/telephonyService');
 const storageService = require('../services/storageService');
 const db = require('../models');
@@ -41,11 +42,48 @@ const uploadRecording = asyncHandler(async (req, res) => {
   return created(res, { data: call, message: 'Call recording stored' });
 });
 
+// Active agents for the calls filter dropdown.
+const agents = asyncHandler(async (req, res) => {
+  const rows = await db.User.findAll({
+    where: { status: 'active' },
+    attributes: ['id', 'name'],
+    order: [['name', 'ASC']],
+  });
+  return success(res, { data: rows });
+});
+
 const list = asyncHandler(async (req, res) => {
   const where = {};
+  // Counselors are locked to their own calls; others may filter by agent.
   if (req.user.role?.slug === ROLES.COUNSELOR) where.agent_id = req.user.id;
+  else if (req.query.agent_id) where.agent_id = req.query.agent_id;
+
   if (req.query.lead_id) where.lead_id = req.query.lead_id;
   if (req.query.status) where.status = req.query.status;
+
+  // Date range on started_at (from/to are ISO strings; default to today).
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const from = req.query.from ? new Date(req.query.from) : startOfToday;
+  const to = req.query.to ? new Date(req.query.to) : now;
+  if (!Number.isNaN(from.getTime()) || !Number.isNaN(to.getTime())) {
+    where.started_at = {};
+    if (!Number.isNaN(from.getTime())) where.started_at[Op.gte] = from;
+    if (!Number.isNaN(to.getTime())) where.started_at[Op.lte] = to;
+  }
+
+  // Free-text search across dialled number and the linked student.
+  const search = (req.query.search || '').trim();
+  if (search) {
+    const like = { [Op.like]: `%${search}%` };
+    where[Op.or] = [
+      { to_number: like },
+      { from_number: like },
+      { '$lead.student.first_name$': like },
+      { '$lead.student.last_name$': like },
+      { '$lead.student.phone$': like },
+    ];
+  }
 
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(100, parseInt(req.query.limit, 10) || 20);
@@ -60,6 +98,9 @@ const list = asyncHandler(async (req, res) => {
     order: [['started_at', 'DESC']],
     limit,
     offset: (page - 1) * limit,
+    // All includes are one-to-one, so a flat query keeps the nested `$...$`
+    // search filter working correctly with LIMIT.
+    subQuery: false,
     distinct: true,
   });
   return success(res, { data: rows, meta: paginate({ page, limit, total: count }) });
@@ -111,6 +152,7 @@ module.exports = {
   clickToCall,
   uploadRecording,
   list,
+  agents,
   show,
   retryTranscription,
   recordingUrl,

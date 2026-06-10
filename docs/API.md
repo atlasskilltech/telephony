@@ -80,7 +80,8 @@ endpoint remains for API clients / admin break-glass but is not shown in the UI.
 |--------|------|-----------|-------|
 | POST | `/calls/upload-recording` | `calls.create` | **mobile dialer** — multipart upload of a recorded call (see below) |
 | POST | `/calls/click-to-call` | `calls.create` | `lead_id` and/or `to_number` (one required) — only if a cloud provider is configured |
-| GET | `/calls` | `calls.view` | filters `lead_id, status`; paginated. Counselors see only their own calls |
+| GET | `/calls` | `calls.view` | filters `agent_id, lead_id, status, search` (lead name/number) and `from, to` (ISO; **defaults to today**); paginated. Counselors see only their own calls |
+| GET | `/calls/agents` | `calls.view` | active agents `[{id,name}]` for the agent filter |
 | GET | `/calls/:id` | `calls.view` | full call incl. `recording`, `transcript`, `analysis`, `lead` |
 | POST | `/calls/:id/retry-transcription` | `calls.create` | re-queue transcription + analysis for the stored recording (no re-upload) |
 | GET | `/calls/:id/recording-url` | `calls.recording.view` | time-limited URL to the archived recording |

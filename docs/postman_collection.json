@@ -281,19 +281,25 @@
           "name": "List",
           "request": {
             "method": "GET",
+            "description": "Defaults to today's calls when from/to omitted. Filter by agent_id, status, lead_id, search (lead name/number) and from/to (ISO).",
             "url": {
-              "raw": "{{baseUrl}}/calls?page=1&limit=20&lead_id=&status=",
+              "raw": "{{baseUrl}}/calls?page=1&limit=20&search=&agent_id=&status=&from=&to=",
               "host": ["{{baseUrl}}"],
               "path": ["calls"],
               "query": [
                 { "key": "page", "value": "1" },
                 { "key": "limit", "value": "20" },
-                { "key": "lead_id", "value": "" },
-                { "key": "status", "value": "" }
+                { "key": "search", "value": "", "description": "lead name or number" },
+                { "key": "agent_id", "value": "" },
+                { "key": "status", "value": "" },
+                { "key": "lead_id", "value": "", "disabled": true },
+                { "key": "from", "value": "", "description": "ISO datetime; defaults to start of today" },
+                { "key": "to", "value": "", "description": "ISO datetime; defaults to now" }
               ]
             }
           }
         },
+        { "name": "Agents (filter)", "request": { "method": "GET", "url": "{{baseUrl}}/calls/agents" } },
         {
           "name": "Upload recording (mobile dialer)",
           "request": {
