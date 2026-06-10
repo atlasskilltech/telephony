@@ -100,15 +100,19 @@ class DashboardService {
   }
 
   /**
-   * Call-analysis dashboard: aggregate QA metrics, score trend, sentiment
-   * split, QA-parameter radar, agent leaderboard and recent calls over the
-   * last N days (with deltas vs. the preceding N-day window).
+   * Call-analysis dashboard over a date window [from, to] (defaults to the last
+   * 30 days). Deltas compare against the preceding equal-length window. Pass
+   * from === null for an all-time view (no deltas).
    */
-  async callAnalytics(user, days = 30) {
+  async callAnalytics(user, { from, to } = {}) {
     const agentScope = this._agentScope(user);
     const now = new Date();
-    const since = new Date(now.getTime() - days * 86400000);
-    const prevSince = new Date(now.getTime() - 2 * days * 86400000);
+    const toD = to ? new Date(to) : now;
+    let fromD;
+    let allTime = false;
+    if (from === null) { allTime = true; fromD = null; }
+    else if (from) fromD = new Date(from);
+    else fromD = new Date(toD.getTime() - 30 * 86400000);
 
     const baseInclude = [
       {
@@ -125,19 +129,25 @@ class DashboardService {
       },
     ];
 
-    const [rows, prevRows] = await Promise.all([
-      db.CallLog.findAll({
-        where: { ...agentScope, started_at: { [Op.gte]: since } },
-        attributes: ['id', 'started_at', 'talk_time_seconds', 'duration_seconds', 'status', 'is_missed', 'direction', 'to_number', 'agent_id'],
-        include: baseInclude,
-        order: [['started_at', 'DESC']],
-      }),
-      db.CallLog.findAll({
-        where: { ...agentScope, started_at: { [Op.gte]: prevSince, [Op.lt]: since } },
+    const rows = await db.CallLog.findAll({
+      where: { ...agentScope, started_at: fromD ? { [Op.gte]: fromD, [Op.lte]: toD } : { [Op.lte]: toD } },
+      attributes: ['id', 'started_at', 'talk_time_seconds', 'duration_seconds', 'status', 'is_missed', 'direction', 'to_number', 'agent_id'],
+      include: baseInclude,
+      order: [['started_at', 'DESC']],
+    });
+
+    // Previous equal-length window for deltas (skipped for all-time).
+    const compare = !allTime && !!fromD;
+    let prevRows = [];
+    if (compare) {
+      const span = toD.getTime() - fromD.getTime();
+      const prevFrom = new Date(fromD.getTime() - span);
+      prevRows = await db.CallLog.findAll({
+        where: { ...agentScope, started_at: { [Op.gte]: prevFrom, [Op.lt]: fromD } },
         attributes: ['id', 'talk_time_seconds', 'status'],
         include: [{ model: db.CallAnalysis, as: 'analysis', attributes: ['sentiment', 'call_quality_score', 'agent_score', 'interest_score'] }],
-      }),
-    ]);
+      });
+    }
 
     const basics = (list) => {
       const total = list.length;
@@ -158,8 +168,8 @@ class DashboardService {
     const prev = basics(prevRows);
     const dir = (d) => (d > 0 ? 'up' : d < 0 ? 'down' : 'flat');
     const metric = (key, unit) => {
-      const delta = cur[key] - prev[key];
-      return { value: cur[key], delta, dir: dir(delta), unit };
+      const delta = compare ? cur[key] - prev[key] : 0;
+      return { value: cur[key], delta, dir: compare ? dir(delta) : 'flat', unit };
     };
     const metrics = {
       totalCalls: metric('totalCalls'),
@@ -169,18 +179,27 @@ class DashboardService {
       resolution: metric('resolution', '%'),
     };
 
-    // Weekly score trend + volume.
-    const weeks = Math.max(1, Math.ceil(days / 7));
-    const buckets = Array.from({ length: weeks }, () => ({ calls: 0, sum: 0, n: 0 }));
+    // Adaptive score trend + volume — up to 12 equal buckets across the range,
+    // so Today / 7d / 30d / All-time all render sensibly.
+    const anchor = fromD
+      || (rows.length ? new Date(Math.min(...rows.map((r) => new Date(r.started_at).getTime()))) : new Date(toD.getTime() - 30 * 86400000));
+    const span = Math.max(1, toD.getTime() - anchor.getTime());
+    const nB = Math.max(1, Math.min(12, Math.ceil(span / 86400000)));
+    const bucketMs = span / nB;
+    const buckets = Array.from({ length: nB }, () => ({ calls: 0, sum: 0, n: 0 }));
     rows.forEach((r) => {
-      const idx = Math.min(weeks - 1, Math.floor((new Date(r.started_at).getTime() - since.getTime()) / (7 * 86400000)));
-      if (idx < 0) return;
+      let idx = Math.floor((new Date(r.started_at).getTime() - anchor.getTime()) / bucketMs);
+      if (idx < 0) idx = 0;
+      if (idx >= nB) idx = nB - 1;
       buckets[idx].calls += 1;
       const s = scoreOf(r);
       if (s != null) { buckets[idx].sum += s; buckets[idx].n += 1; }
     });
+    const fmtLabel = (ms) => { const d = new Date(ms); return `${d.getDate()}/${d.getMonth() + 1}`; };
     const scoreTrend = buckets.map((b, i) => ({
-      label: `W${i + 1}`, calls: b.calls, avgScore: b.n ? Math.round(b.sum / b.n) : null,
+      label: fmtLabel(anchor.getTime() + i * bucketMs),
+      calls: b.calls,
+      avgScore: b.n ? Math.round(b.sum / b.n) : null,
     }));
 
     // Sentiment split.
@@ -232,7 +251,6 @@ class DashboardService {
     }));
 
     return {
-      rangeDays: days,
       analyzedCount: rows.filter((r) => r.analysis && r.analysis.status === 'completed').length,
       metrics,
       scoreTrend,

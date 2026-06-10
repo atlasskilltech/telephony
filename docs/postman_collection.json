@@ -139,11 +139,15 @@
           "name": "Call analytics",
           "request": {
             "method": "GET",
+            "description": "ISO from/to window; omit for last 30 days; from= empty for all-time.",
             "url": {
-              "raw": "{{baseUrl}}/dashboard/call-analytics?days=30",
+              "raw": "{{baseUrl}}/dashboard/call-analytics?from=&to=",
               "host": ["{{baseUrl}}"],
               "path": ["dashboard", "call-analytics"],
-              "query": [{ "key": "days", "value": "30" }]
+              "query": [
+                { "key": "from", "value": "", "description": "ISO datetime; empty = all-time" },
+                { "key": "to", "value": "", "description": "ISO datetime; defaults to now" }
+              ]
             }
           }
         },

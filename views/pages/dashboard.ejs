@@ -1,7 +1,27 @@
 <div x-data="dashboardPage()" x-init="init()">
-  <div class="mb-5">
-    <h1 class="text-xl font-semibold">Call analysis dashboard</h1>
-    <p class="text-sm text-slate-500" x-text="`Telephony QA · last ${d.rangeDays||30} days · ${(d.analyzedCount||0).toLocaleString()} calls analyzed`"></p>
+  <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold">Call analysis dashboard</h1>
+      <p class="text-sm text-slate-500" x-text="`Telephony QA · ${rangeLabel()} · ${(d.analyzedCount||0).toLocaleString()} calls analyzed`"></p>
+    </div>
+    <div class="flex items-center gap-2">
+      <select x-model="filters.range" @change="onRangeChange()"
+        class="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none text-sm">
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+        <option value="all">All time</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <template x-if="filters.range==='custom'">
+        <div class="flex items-center gap-2">
+          <input type="date" x-model="filters.from" @change="load()" class="px-3 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none text-sm" />
+          <span class="text-slate-400">–</span>
+          <input type="date" x-model="filters.to" @change="load()" class="px-3 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 outline-none text-sm" />
+        </div>
+      </template>
+    </div>
   </div>
 
   <!-- Metric cards -->
