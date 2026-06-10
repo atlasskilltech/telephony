@@ -171,14 +171,17 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/leads?page=1&limit=20&search=&pipeline_stage=",
+              "raw": "{{baseUrl}}/leads?page=1&limit=20&search=&pipeline_stage=&assigned_to=&called=&min_interest=",
               "host": ["{{baseUrl}}"],
               "path": ["leads"],
               "query": [
                 { "key": "page", "value": "1" },
                 { "key": "limit", "value": "20" },
-                { "key": "search", "value": "" },
-                { "key": "pipeline_stage", "value": "" }
+                { "key": "search", "value": "", "description": "name or phone" },
+                { "key": "pipeline_stage", "value": "" },
+                { "key": "assigned_to", "value": "", "description": "agent user id" },
+                { "key": "called", "value": "", "description": "true=Called, false=New Data" },
+                { "key": "min_interest", "value": "", "description": "AI interest >= n (e.g. 50)" }
               ]
             }
           }

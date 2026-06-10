@@ -160,6 +160,14 @@ class TelephonyService {
       description: `Mobile call recording uploaded for ${customerNumber}`,
     });
 
+    // A connected call marks the lead "Called" and auto-advances the stage.
+    const connected = !toBool(isMissed) && (status || CALL_STATUSES.COMPLETED) !== CALL_STATUSES.MISSED;
+    if (lead && connected) {
+      const patch = { last_contacted_at: new Date() };
+      if (lead.pipeline_stage === 'new_lead') patch.pipeline_stage = 'contacted';
+      await lead.update(patch);
+    }
+
     // Transcribe + analyse off the request path (stub output if AI disabled).
     await transcriptionQueue.add('transcribe', { callId: call.id, recordingId: recording.id });
 

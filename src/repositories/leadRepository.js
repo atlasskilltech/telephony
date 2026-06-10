@@ -32,6 +32,17 @@ class LeadRepository extends BaseRepository {
     if (filters.course) where.course = { [Op.like]: `%${filters.course}%` };
     if (filters.city) where.city = { [Op.like]: `%${filters.city}%` };
     if (filters.priority) where.priority = filters.priority;
+    // Call status: New Data (never contacted) vs Called (a call connected).
+    if (filters.called === 'true' || filters.called === true) {
+      where.last_contacted_at = { [Op.ne]: null };
+    } else if (filters.called === 'false' || filters.called === false) {
+      where.last_contacted_at = null;
+    }
+    // AI interest threshold bucket (>= n%).
+    const minInterest = Number(filters.min_interest);
+    if (Number.isFinite(minInterest) && minInterest > 0) {
+      where.ai_interest_score = { [Op.gte]: minInterest };
+    }
     if (filters.from || filters.to) {
       where.created_at = {};
       if (filters.from) where.created_at[Op.gte] = new Date(filters.from);
@@ -44,7 +55,7 @@ class LeadRepository extends BaseRepository {
     const where = this.buildWhere(filters);
     const include = this.defaultInclude();
 
-    // Free-text search across student name / phone / email.
+    // Free-text search across student name and phone only.
     if (filters.search) {
       const term = `%${filters.search}%`;
       include[0].where = {
@@ -52,7 +63,6 @@ class LeadRepository extends BaseRepository {
           { first_name: { [Op.like]: term } },
           { last_name: { [Op.like]: term } },
           { phone: { [Op.like]: term } },
-          { email: { [Op.like]: term } },
         ],
       };
       include[0].required = true;

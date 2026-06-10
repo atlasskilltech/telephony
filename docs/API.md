@@ -61,7 +61,7 @@ endpoint remains for API clients / admin break-glass but is not shown in the UI.
 ## Leads — `/leads`
 | Method | Path | Permission | Notes |
 |--------|------|-----------|-------|
-| GET | `/leads` | `leads.view` | filters: `search, course, city, source_id, status_id, assigned_to, pipeline_stage, priority, from, to` |
+| GET | `/leads` | `leads.view` | filters: `search` (name/phone), `assigned_to` (agent), `pipeline_stage`, `called` (`true`=Called / `false`=New Data), `min_interest` (AI interest ≥ n%), `course, city, source_id, status_id, priority, from, to` |
 | POST | `/leads` | `leads.create` | `first_name, phone` required; `auto_assign, strategy` optional |
 | GET | `/leads/:id` | `leads.view` | full lead incl. followups & calls |
 | PUT | `/leads/:id` | `leads.update` | |
