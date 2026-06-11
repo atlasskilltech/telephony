@@ -374,7 +374,32 @@ class NpfService {
         lastError: String(detail).slice(0, 1000),
         lastErrorAt: new Date().toISOString(),
       });
-      return { skipped: true, reason: 'error' };
+      return { skipped: true, reason: 'error', httpStatus, message: String(detail).slice(0, 300) };
+    }
+  }
+
+  /**
+   * Connectivity/credential check: make one real call to NoPaperForms and
+   * report whether it succeeded, the HTTP status and any error body. Lets a
+   * Super Admin confirm egress + key validity independent of lead matching.
+   */
+  async testConnection(mobile) {
+    await this.refresh();
+    if (!this.enabled) return { ok: false, reason: 'not_configured' };
+    const num = NpfService.normalizeMobile(mobile) || '9999999999';
+    const started = Date.now();
+    try {
+      const data = await this.getDetailsByMobileNumber(num);
+      return {
+        ok: true,
+        httpStatus: 200,
+        ms: Date.now() - started,
+        leadFound: !!NpfService.extractLeadId(data),
+      };
+    } catch (err) {
+      const httpStatus = err.response ? err.response.status : null;
+      const message = err.response ? JSON.stringify(err.response.data) : (err.code || err.message);
+      return { ok: false, reason: httpStatus ? 'rejected' : 'unreachable', httpStatus, message: String(message).slice(0, 300), ms: Date.now() - started };
     }
   }
 }
