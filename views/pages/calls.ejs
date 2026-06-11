@@ -31,11 +31,18 @@
 
   <!-- Super Admin: key entry (also reachable when already enabled, to update keys). -->
   <div x-show="isSuperAdmin && showNpfConfig" x-cloak class="mb-4 px-4 py-3 rounded-lg bg-slate-50 border border-slate-200 dark:bg-slate-800/50 dark:border-slate-700 grid sm:grid-cols-2 gap-2">
-    <input x-model="npfForm.secret_key" type="password" placeholder="Secret key"
+    <p class="sm:col-span-2 text-xs text-slate-500">
+      For security, saved keys are never shown again — these boxes always start empty.
+      <span x-show="npfStatus.hasSecretKey || npfStatus.hasAccessKey">A key is already saved; leave a box blank to keep it, or type a new value to replace it.</span>
+    </p>
+    <input x-model="npfForm.secret_key" type="password" autocomplete="off"
+      :placeholder="npfStatus.hasSecretKey ? ('Secret key — saved: ' + (npfStatus.secretKeyHint || '••••') + ' (blank = keep)') : 'Secret key'"
       class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none" />
-    <input x-model="npfForm.access_key" type="password" placeholder="Access key"
+    <input x-model="npfForm.access_key" type="password" autocomplete="off"
+      :placeholder="npfStatus.hasAccessKey ? ('Access key — saved: ' + (npfStatus.accessKeyHint || '••••') + ' (blank = keep)') : 'Access key'"
       class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none" />
-    <input x-model="npfForm.activity_config_id" placeholder="Activity config id (optional)"
+    <input x-model="npfForm.activity_config_id"
+      :placeholder="'Activity config id (optional)' + (npfStatus.activityConfigId ? ' — current: ' + npfStatus.activityConfigId : '')"
       class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none sm:col-span-2" />
     <div class="sm:col-span-2 flex items-center gap-2">
       <button type="button" @click="saveNpfConfig()" :disabled="savingNpf"

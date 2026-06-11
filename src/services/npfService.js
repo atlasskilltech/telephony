@@ -127,11 +127,20 @@ class NpfService {
    */
   status() {
     const c = this.cfg || this._fromEnv();
+    // Masked hint (first 3 + last 4) so an admin can verify which key is
+    // stored without the full secret ever leaving the server.
+    const mask = (v) => {
+      if (!v) return null;
+      const s = String(v);
+      return s.length <= 8 ? '••••' : `${s.slice(0, 3)}…${s.slice(-4)}`;
+    };
     return {
       enabled: this.enabled,
       flagEnabled: c.enabled,
       hasSecretKey: !!c.secretKey,
       hasAccessKey: !!c.accessKey,
+      secretKeyHint: mask(c.secretKey),
+      accessKeyHint: mask(c.accessKey),
       source: this._loadedFromDb ? 'db+env' : 'env',
       baseUrl: c.baseUrl,
       activityConfigId: c.activityConfigId,
