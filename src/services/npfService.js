@@ -140,8 +140,25 @@ class NpfService {
   }
 
   /**
+   * Merge a patch into `call.meta.npf` so every NPF outcome (synced, skipped or
+   * failed) is persisted on the call alongside the app log. Best-effort: a
+   * persistence failure is logged but never propagated.
+   */
+  static async recordState(call, patch) {
+    try {
+      const prior = (call.meta && call.meta.npf) || {};
+      await call.update({
+        meta: { ...(call.meta || {}), npf: { ...prior, ...patch, updatedAt: new Date().toISOString() } },
+      });
+    } catch (err) {
+      logger.error(`Failed to persist NPF state for call ${call.id}: ${err.message}`);
+    }
+  }
+
+  /**
    * Push (or update) the post-call Dynamic Activity for a completed analysis.
    * Never throws — NPF being unreachable must not fail the analysis job.
+   * Every outcome is logged AND persisted to `call.meta.npf`.
    *
    * @returns {Promise<{ skipped?: boolean, reason?: string, activityId?: string }>}
    */
@@ -151,7 +168,11 @@ class NpfService {
       // Outbound: the lead is the dialled (to) number; inbound: the caller.
       const mobile = call.direction === 'inbound' ? call.from_number : call.to_number;
       const normalized = NpfService.normalizeMobile(mobile);
-      if (!normalized) return { skipped: true, reason: 'no_mobile' };
+      if (!normalized) {
+        logger.warn(`NPF activity skipped for call ${call.id}: no usable mobile number`);
+        await NpfService.recordState(call, { status: 'skipped', reason: 'no_mobile', lastError: null });
+        return { skipped: true, reason: 'no_mobile' };
+      }
 
       const detail = await this.getDetailsByMobileNumber(normalized).catch((err) => {
         logger.warn(`NPF lookup failed for call ${call.id}: ${err.message}`);
@@ -182,7 +203,16 @@ class NpfService {
           dynamic_fields: dynamicFields,
         });
       } else {
-        if (!leadId) return { skipped: true, reason: 'lead_not_found' };
+        if (!leadId) {
+          logger.warn(`NPF activity skipped for call ${call.id}: lead not found for mobile ${normalized}`);
+          await NpfService.recordState(call, {
+            status: 'skipped',
+            reason: 'lead_not_found',
+            mobile: normalized,
+            lastError: null,
+          });
+          return { skipped: true, reason: 'lead_not_found' };
+        }
         response = await this.createDynamicActivity({
           activity_config_id: config.npf.activityConfigId,
           search_criteria: leadId,
@@ -198,26 +228,37 @@ class NpfService {
         activityId = NpfService.extractActivityId(response) || activityId;
       }
 
-      // Persist the linkage so a retry updates instead of duplicating.
-      await call.update({
-        meta: {
-          ...(call.meta || {}),
-          npf: {
-            ...prior,
-            activityId: activityId || prior.activityId || null,
-            leadId: leadId || prior.leadId || null,
-            ownerId: ownerId || prior.ownerId || null,
-            transcriptUrl,
-            syncedAt: new Date().toISOString(),
-          },
-        },
+      // Persist the linkage so a retry updates instead of duplicating, and
+      // clear any prior error so the call shows a clean, synced state.
+      await NpfService.recordState(call, {
+        status: 'synced',
+        action: prior.activityId ? 'update' : 'create',
+        activityId: activityId || prior.activityId || null,
+        leadId: leadId || prior.leadId || null,
+        ownerId: ownerId || prior.ownerId || null,
+        transcriptUrl,
+        syncedAt: new Date().toISOString(),
+        lastError: null,
+        lastErrorAt: null,
       });
 
       logger.info(`NPF activity synced for call ${call.id} (lead ${leadId || 'n/a'}, activity ${activityId || 'n/a'})`);
       return { activityId };
     } catch (err) {
+      // Surface the failure in the app log AND persist it on the call so it is
+      // visible/queryable without trawling logs.
+      const httpStatus = err.response ? err.response.status : null;
       const detail = err.response ? JSON.stringify(err.response.data) : err.message;
-      logger.error(`NPF activity sync failed for call ${call.id}: ${detail}`);
+      logger.error(
+        `NPF activity sync failed for call ${call.id}${httpStatus ? ` [HTTP ${httpStatus}]` : ''}: ${detail}`
+      );
+      await NpfService.recordState(call, {
+        status: 'failed',
+        reason: 'error',
+        lastErrorStatus: httpStatus,
+        lastError: String(detail).slice(0, 1000),
+        lastErrorAt: new Date().toISOString(),
+      });
       return { skipped: true, reason: 'error' };
     }
   }
