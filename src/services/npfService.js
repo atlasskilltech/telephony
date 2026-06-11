@@ -38,6 +38,11 @@ class NpfService {
     }
   }
 
+  /** Whether the NoPaperForms integration has usable credentials. */
+  isConfigured() {
+    return this.enabled;
+  }
+
   /** Last-10-digit local mobile (NPF stores numbers without a country code). */
   static normalizeMobile(raw) {
     const digits = String(raw || '').replace(/\D/g, '');

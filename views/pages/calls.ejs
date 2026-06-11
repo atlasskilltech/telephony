@@ -1,4 +1,12 @@
 <div x-data="callsPage()" x-init="init()">
+  <!-- NoPaperForms not configured: the manual "Post" action will be skipped. -->
+  <div x-show="!npfEnabled" x-cloak class="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+    <span class="font-medium">NoPaperForms posting is not enabled.</span>
+    Set <code class="px-1 rounded bg-amber-100 dark:bg-amber-500/20">NPF_SECRET_KEY</code> and
+    <code class="px-1 rounded bg-amber-100 dark:bg-amber-500/20">NPF_ACCESS_KEY</code> on the server (then restart) to activate the
+    <span class="font-medium">Post</span> button.
+  </div>
+
   <!-- Filters -->
   <div class="flex flex-wrap items-end gap-3 mb-4">
     <div class="relative flex-1 min-w-[200px]">
@@ -84,8 +92,9 @@
                 <button type="button" x-show="!retrying[c.id] && c.recording" @click="retry(c)"
                   class="ml-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-xs cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Retry</button>
                 <button type="button" x-show="!retrying[c.id] && c.analysis && c.analysis.status==='completed'" @click="postNpf(c)" :disabled="posting[c.id]"
-                  title="Push transcript URL + scores to NoPaperForms"
-                  class="ml-1 px-2 py-0.5 rounded-md bg-indigo-600 text-white text-xs font-medium cursor-pointer hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :title="npfEnabled ? 'Push transcript URL + scores to NoPaperForms' : 'NoPaperForms is not configured — set NPF keys to enable'"
+                  class="ml-1 px-2 py-0.5 rounded-md text-white text-xs font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="npfEnabled ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-400 hover:bg-slate-500'"
                   x-text="posting[c.id] ? 'Posting…' : 'Post'"></button>
                 <div x-show="c.meta && c.meta.npf" class="text-[11px] mt-1" :class="npfColor(c)" x-text="npfLabel(c)"></div>
               </td>
@@ -130,6 +139,7 @@
   <%- include('../partials/callReport') %>
 </div>
 <script>
+  window.__NPF_ENABLED__ = <%- npfEnabled ? 'true' : 'false' %>;
   window.callsPage = function () {
     const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const endOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
@@ -142,6 +152,7 @@
       agents: [],
       retrying: {},
       posting: {},
+      npfEnabled: window.__NPF_ENABLED__ === true,
       async init() {
         await this.load();
         this.loadAgents();

@@ -93,6 +93,17 @@ const publicReport = (req, res) =>
 const page = (view, title) => (req, res) =>
   res.render(`pages/${view}`, { title, user: req.user, roleSlug: req.roleSlug, active: view });
 
+// Calls page also needs to know whether the NoPaperForms integration is
+// configured, so the UI can reflect/disable the manual "Post" action.
+const calls = (req, res) =>
+  res.render('pages/calls', {
+    title: 'Call Details',
+    user: req.user,
+    roleSlug: req.roleSlug,
+    active: 'calls',
+    npfEnabled: require('../services/npfService').isConfigured(),
+  });
+
 module.exports = {
   loginPage,
   doLogin,
@@ -103,7 +114,7 @@ module.exports = {
   dashboard: page('dashboard', 'Dashboard'),
   leads: page('leads', 'Call Database'),
   pipeline: page('pipeline', 'Pipeline'),
-  calls: page('calls', 'Call Details'),
+  calls,
   followups: page('followups', 'Follow-ups'),
   reports: page('reports', 'Reports'),
   users: page('users', 'Users'),
