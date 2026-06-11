@@ -105,6 +105,10 @@
               <td class="px-4 py-3">
                 <div class="font-medium" x-text="c.lead?.student?.first_name || c.to_number"></div>
                 <div class="text-xs text-slate-400" x-show="c.lead?.student?.first_name" x-text="c.to_number"></div>
+                <button type="button" @click="getLead(c)" :disabled="loadingLead[c.id]"
+                  title="Look up this number in NoPaperForms"
+                  class="mt-1 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                  x-text="loadingLead[c.id] ? 'Looking up…' : 'Lead details'"></button>
               </td>
               <td class="px-4 py-3" x-text="c.agent?.name || '—'"></td>
               <td class="px-4 py-3 capitalize">
@@ -202,6 +206,7 @@
       agents: [],
       retrying: {},
       posting: {},
+      loadingLead: {},
       npfEnabled: window.__NPF_ENABLED__ === true,
       npfChecked: false,
       npfStatus: {},
@@ -365,6 +370,29 @@
         } catch (e) {
           this.retrying[c.id] = false;
           alert(e.message);
+        }
+      },
+      // ---- NoPaperForms lead lookup ----
+      async getLead(c) {
+        this.loadingLead[c.id] = true;
+        try {
+          const res = await api.get(`/api/v1/calls/${c.id}/npf-lead`);
+          const r = res.data || {};
+          if (!r.ok) {
+            if (r.reason === 'not_configured') alert('NoPaperForms is not configured yet.');
+            else if (r.reason === 'no_mobile') alert('This call has no usable phone number.');
+            else if (r.reason === 'rejected') alert(`NoPaperForms rejected the request (HTTP ${r.httpStatus}): ${r.message}`);
+            else alert(`Could not reach NoPaperForms: ${r.message || ''}`);
+            return;
+          }
+          if (!r.record) { alert(`No NoPaperForms lead found for ${r.mobile}.`); return; }
+          const lines = Object.entries(r.record)
+            .map(([k, v]) => `${k}: ${v && typeof v === 'object' ? JSON.stringify(v) : (v ?? '—')}`);
+          alert(`NoPaperForms lead — ${r.mobile}\nLead id: ${r.leadId || '—'}\n\n${lines.join('\n')}`);
+        } catch (e) {
+          alert(e.message);
+        } finally {
+          this.loadingLead[c.id] = false;
         }
       },
       // ---- NoPaperForms manual post + status ----
