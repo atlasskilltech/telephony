@@ -1,10 +1,9 @@
 <div x-data="callsPage()" x-init="init()">
-  <!-- NoPaperForms not configured: the manual "Post" action will be skipped. -->
-  <div x-show="!npfEnabled" x-cloak class="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+  <!-- NoPaperForms not configured: the manual "Post" action will be skipped.
+       Driven by the live /npf-status check, with the precise reason. -->
+  <div x-show="npfChecked && !npfEnabled" x-cloak class="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
     <span class="font-medium">NoPaperForms posting is not enabled.</span>
-    Set <code class="px-1 rounded bg-amber-100 dark:bg-amber-500/20">NPF_SECRET_KEY</code> and
-    <code class="px-1 rounded bg-amber-100 dark:bg-amber-500/20">NPF_ACCESS_KEY</code> on the server (then restart) to activate the
-    <span class="font-medium">Post</span> button.
+    <span x-text="npfStatusMessage()"></span>
   </div>
 
   <!-- Filters -->
@@ -153,9 +152,31 @@
       retrying: {},
       posting: {},
       npfEnabled: window.__NPF_ENABLED__ === true,
+      npfChecked: false,
+      npfStatus: {},
       async init() {
         await this.load();
         this.loadAgents();
+        this.loadNpfStatus();
+      },
+      async loadNpfStatus() {
+        try {
+          const res = await api.get('/api/v1/calls/npf-status');
+          this.npfStatus = res.data || {};
+          this.npfEnabled = !!this.npfStatus.enabled;
+        } catch (e) {
+          this.npfStatus = {};
+        } finally {
+          this.npfChecked = true;
+        }
+      },
+      npfStatusMessage() {
+        const s = this.npfStatus || {};
+        if (s.flagEnabled === false) return 'NPF_ENABLED is set to false on the server — set it to true (or unset it) and restart.';
+        if (s.hasSecretKey === false && s.hasAccessKey === false) return 'The server has no NPF_SECRET_KEY or NPF_ACCESS_KEY — set both (check for typos in the variable names) and restart.';
+        if (s.hasSecretKey === false) return 'NPF_SECRET_KEY is missing on the server — set it and restart.';
+        if (s.hasAccessKey === false) return 'NPF_ACCESS_KEY is missing on the server — set it and restart.';
+        return 'Set the NPF keys on the server and restart to activate the Post button.';
       },
       computeRange() {
         const now = new Date();

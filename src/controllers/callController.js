@@ -49,6 +49,10 @@ const uploadRecording = asyncHandler(async (req, res) => {
   return created(res, { data: call, message: 'Call recording stored' });
 });
 
+// Live NoPaperForms integration status (non-secret) for the calls page, so the
+// UI reflects the running server's actual config rather than a stale render.
+const npfStatus = asyncHandler(async (req, res) => success(res, { data: npfService.status() }));
+
 // Active agents for the calls filter dropdown.
 const agents = asyncHandler(async (req, res) => {
   const rows = await db.User.findAll({
@@ -191,6 +195,7 @@ module.exports = {
   uploadRecording,
   list,
   agents,
+  npfStatus,
   show,
   postNpf,
   retryTranscription,
