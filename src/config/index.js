@@ -106,6 +106,18 @@ const config = {
     windowMs: toInt(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
     max: toInt(process.env.RATE_LIMIT_MAX, 300),
   },
+  // NoPaperForms (NPF) lead CRM. After a call is analysed we look up the lead
+  // by mobile and push a Dynamic Activity carrying the public transcript URL
+  // and the call scores. Without secret/access keys the integration runs in
+  // stub mode (logged + skipped) so the pipeline stays runnable in dev.
+  npf: {
+    enabled: toBool(process.env.NPF_ENABLED, true),
+    baseUrl: process.env.NPF_BASE_URL || 'https://api.nopaperforms.io/lead/v1',
+    secretKey: process.env.NPF_SECRET_KEY || '',
+    accessKey: process.env.NPF_ACCESS_KEY || '',
+    activityConfigId: process.env.NPF_ACTIVITY_CONFIG_ID || 'm6lAGd4b9NqZIpD2IKZzf6OLeXMJ2B7Q',
+    timezone: process.env.NPF_TIMEZONE || 'Asia/Kolkata',
+  },
 };
 
 module.exports = config;

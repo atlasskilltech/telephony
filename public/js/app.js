@@ -178,6 +178,29 @@ window.callReportMixin = function callReportMixin() {
   };
 };
 
+// ---- Public, login-free call report page ----
+// Hydrates the shared callReport body from the public API using the call uuid
+// (window.__REPORT_UUID__). No auth — plain fetch, no 401-refresh redirect.
+window.publicReportPage = function publicReportPage() {
+  return {
+    ...window.callReportMixin(),
+    error: '',
+    async init() {
+      this.report.loading = true;
+      const uuid = window.__REPORT_UUID__;
+      try {
+        const res = await fetch(`/api/v1/public/calls/${uuid}`);
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.message || 'Report not found');
+        this.buildReport(json.data);
+      } catch (e) {
+        this.report.loading = false;
+        this.error = e.message || 'Report not found';
+      }
+    },
+  };
+};
+
 // ---- Call analysis dashboard component ----
 window.dashboardPage = function dashboardPage() {
   // Keep Chart instances OUT of Alpine's reactive state — proxying a Chart (and

@@ -2,6 +2,7 @@
 
 const db = require('../../models');
 const aiService = require('../../services/aiService');
+const npfService = require('../../services/npfService');
 const logger = require('../../utils/logger');
 
 /**
@@ -15,7 +16,10 @@ module.exports = async function analysisJob(job) {
   if (!transcript || !transcript.text) throw new Error('Transcript not available for analysis');
 
   const call = await db.CallLog.findByPk(callId, {
-    include: [{ model: db.Lead, as: 'lead' }],
+    include: [
+      { model: db.Lead, as: 'lead' },
+      { model: db.User, as: 'agent' },
+    ],
   });
   const context = {
     course: call?.lead?.course,
@@ -63,6 +67,11 @@ module.exports = async function analysisJob(job) {
       });
     }
     logger.info(`Analysed call ${callId}: interest ${a.interest_score}, sentiment ${a.sentiment}`);
+
+    // Push the public transcript URL + scores to NoPaperForms. This is a
+    // best-effort side effect — npfService never throws, so a CRM outage or
+    // missing lead does not fail (or re-run) the analysis job.
+    await npfService.syncCallActivity({ call, analysis: analysisRow, agent: call.agent });
   } catch (err) {
     await analysisRow.update({ status: 'failed', error: err.message.slice(0, 500) });
     throw err;

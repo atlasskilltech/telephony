@@ -1,0 +1,27 @@
+<div class="max-w-4xl mx-auto" x-data="publicReportPage()" x-init="init()">
+  <div class="flex items-center gap-3 mb-5">
+    <div class="w-9 h-9 rounded-lg bg-indigo-600 text-white grid place-items-center font-semibold">A</div>
+    <div>
+      <div class="text-base font-semibold leading-tight">ATLAS Telephony</div>
+      <div class="text-xs text-slate-500">Call analysis report</div>
+    </div>
+  </div>
+
+  <div class="glass bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+    <template x-if="error">
+      <p class="text-sm text-rose-500 py-10 text-center" x-text="error"></p>
+    </template>
+
+    <template x-if="!error">
+      <div>
+        <%- include('../partials/callReportBody') %>
+      </div>
+    </template>
+  </div>
+
+  <p class="text-center text-xs text-slate-400 mt-5">This report link is private — please don't share it further.</p>
+</div>
+
+<script>
+  window.__REPORT_UUID__ = '<%= uuid %>';
+</script>
