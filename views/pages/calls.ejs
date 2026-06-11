@@ -105,9 +105,10 @@
               <td class="px-4 py-3">
                 <div class="font-medium" x-text="c.lead?.student?.first_name || c.to_number"></div>
                 <div class="text-xs text-slate-400" x-show="c.lead?.student?.first_name" x-text="c.to_number"></div>
-                <button type="button" @click="getLead(c)" :disabled="loadingLead[c.id]"
+                <button type="button" @click="getLead(c)"
                   title="Look up this number in NoPaperForms"
-                  class="mt-1 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                  class="mt-1 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                  :class="loadingLead[c.id] ? 'opacity-60' : ''"
                   x-text="loadingLead[c.id] ? 'Looking up…' : 'Lead details'"></button>
               </td>
               <td class="px-4 py-3" x-text="c.agent?.name || '—'"></td>
@@ -374,7 +375,9 @@
       },
       // ---- NoPaperForms lead lookup ----
       async getLead(c) {
-        this.loadingLead[c.id] = true;
+        if (this.loadingLead[c.id]) return; // guard against double-clicks
+        // Reassign for reliable Alpine reactivity (avoids stuck nested-key state).
+        this.loadingLead = { ...this.loadingLead, [c.id]: true };
         try {
           const res = await api.get(`/api/v1/calls/${c.id}/npf-lead`);
           const r = res.data || {};
@@ -397,7 +400,7 @@
         } catch (e) {
           alert(e.message);
         } finally {
-          this.loadingLead[c.id] = false;
+          this.loadingLead = { ...this.loadingLead, [c.id]: false };
         }
       },
       // ---- NoPaperForms manual post + status ----
