@@ -33,6 +33,7 @@ router.post(
 router.get('/recordings/stream', requirePermission('calls.recording.view'), callController.streamRecording);
 router.get('/:id', requirePermission('calls.view'), callController.show);
 router.post('/:id/retry-transcription', requirePermission('calls.create'), callController.retryTranscription);
+router.post('/:id/npf-sync', requirePermission('calls.create'), callController.postNpf);
 router.get('/:id/recording-url', requirePermission('calls.recording.view'), callController.recordingUrl);
 
 module.exports = router;
