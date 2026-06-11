@@ -43,6 +43,22 @@ class NpfService {
     return this.enabled;
   }
 
+  /**
+   * Non-secret diagnostic view of the live config so the UI can tell the user
+   * exactly why posting is/isn't enabled (e.g. which key the server is missing).
+   */
+  status() {
+    return {
+      enabled: this.enabled,
+      flagEnabled: config.npf.enabled,
+      hasSecretKey: !!config.npf.secretKey,
+      hasAccessKey: !!config.npf.accessKey,
+      baseUrl: config.npf.baseUrl,
+      activityConfigId: config.npf.activityConfigId,
+      timezone: config.npf.timezone,
+    };
+  }
+
   /** Last-10-digit local mobile (NPF stores numbers without a country code). */
   static normalizeMobile(raw) {
     const digits = String(raw || '').replace(/\D/g, '');
