@@ -40,6 +40,21 @@ describe('NpfService helpers', () => {
     });
   });
 
+  describe('sanitizeKey', () => {
+    it('strips surrounding double quotes (the 401 cause)', () => {
+      expect(NpfService.sanitizeKey('"e3abc078"')).toBe('e3abc078');
+    });
+    it('strips surrounding single quotes and whitespace', () => {
+      expect(NpfService.sanitizeKey("  'abc123'  ")).toBe('abc123');
+    });
+    it('leaves a clean key untouched', () => {
+      expect(NpfService.sanitizeKey('e3abc078')).toBe('e3abc078');
+    });
+    it('does not strip quotes that are not a matching pair', () => {
+      expect(NpfService.sanitizeKey('"abc')).toBe('"abc');
+    });
+  });
+
   describe('extractLeadId', () => {
     it('reads lead_id from a data array', () => {
       expect(NpfService.extractLeadId({ data: [{ lead_id: 42 }] })).toBe('42');
