@@ -7,25 +7,41 @@
         <span class="font-medium">NoPaperForms posting is not enabled.</span>
         <span x-text="npfStatusMessage()"></span>
       </div>
-      <button x-show="isSuperAdmin" type="button" @click="showNpfConfig=!showNpfConfig"
+      <button x-show="isSuperAdmin" type="button" @click="showNpfConfig=true"
         class="shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium cursor-pointer hover:bg-amber-700">
         Configure
       </button>
     </div>
-    <!-- Super Admin: enter keys here; stored in the DB and used immediately (no restart). -->
-    <div x-show="isSuperAdmin && showNpfConfig" x-cloak class="mt-3 pt-3 border-t border-amber-200 dark:border-amber-500/30 grid sm:grid-cols-2 gap-2">
-      <input x-model="npfForm.secret_key" type="password" placeholder="Secret key"
-        class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-500/30 outline-none text-slate-800 dark:text-slate-100" />
-      <input x-model="npfForm.access_key" type="password" placeholder="Access key"
-        class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-500/30 outline-none text-slate-800 dark:text-slate-100" />
-      <input x-model="npfForm.activity_config_id" placeholder="Activity config id (optional)"
-        class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-500/30 outline-none text-slate-800 dark:text-slate-100 sm:col-span-2" />
-      <div class="sm:col-span-2 flex items-center gap-2">
-        <button type="button" @click="saveNpfConfig()" :disabled="savingNpf"
-          class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium cursor-pointer hover:bg-emerald-700 disabled:opacity-50"
-          x-text="savingNpf ? 'Saving…' : 'Save & enable'"></button>
-        <span class="text-xs text-amber-700 dark:text-amber-300">Keys are stored securely in the database and used right away.</span>
-      </div>
+  </div>
+
+  <!-- Super Admin: NoPaperForms status + one-click connectivity test. -->
+  <div x-show="isSuperAdmin && npfChecked" x-cloak class="mb-3 flex flex-wrap items-center gap-2 text-xs">
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+      :class="npfEnabled ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10' : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10'">
+      <span class="w-1.5 h-1.5 rounded-full" :class="npfEnabled ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+      <span x-text="npfEnabled ? 'NoPaperForms enabled' : 'NoPaperForms disabled'"></span>
+    </span>
+    <button type="button" x-show="npfEnabled" @click="testNpf()" :disabled="testingNpf"
+      class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+      x-text="testingNpf ? 'Testing…' : 'Test connection'"></button>
+    <button type="button" @click="showNpfConfig=!showNpfConfig"
+      class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Configure keys</button>
+    <span x-show="npfTestResult" :class="npfTestOk ? 'text-emerald-600' : 'text-rose-500'" x-text="npfTestResult"></span>
+  </div>
+
+  <!-- Super Admin: key entry (also reachable when already enabled, to update keys). -->
+  <div x-show="isSuperAdmin && showNpfConfig" x-cloak class="mb-4 px-4 py-3 rounded-lg bg-slate-50 border border-slate-200 dark:bg-slate-800/50 dark:border-slate-700 grid sm:grid-cols-2 gap-2">
+    <input x-model="npfForm.secret_key" type="password" placeholder="Secret key"
+      class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none" />
+    <input x-model="npfForm.access_key" type="password" placeholder="Access key"
+      class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none" />
+    <input x-model="npfForm.activity_config_id" placeholder="Activity config id (optional)"
+      class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none sm:col-span-2" />
+    <div class="sm:col-span-2 flex items-center gap-2">
+      <button type="button" @click="saveNpfConfig()" :disabled="savingNpf"
+        class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium cursor-pointer hover:bg-emerald-700 disabled:opacity-50"
+        x-text="savingNpf ? 'Saving…' : 'Save & enable'"></button>
+      <span class="text-xs text-slate-500">Stored securely in the database; used immediately, no restart.</span>
     </div>
   </div>
 
@@ -181,6 +197,9 @@
       isSuperAdmin: window.__IS_SUPER_ADMIN__ === true,
       showNpfConfig: false,
       savingNpf: false,
+      testingNpf: false,
+      npfTestResult: '',
+      npfTestOk: false,
       npfForm: { secret_key: '', access_key: '', activity_config_id: '' },
       async init() {
         await this.load();
@@ -206,6 +225,29 @@
         if (s.hasSecretKey === false) return 'The secret key is missing.' + fix;
         if (s.hasAccessKey === false) return 'The access key is missing.' + fix;
         return 'Keys are incomplete.' + fix;
+      },
+      async testNpf() {
+        this.testingNpf = true;
+        this.npfTestResult = '';
+        try {
+          const res = await api.post('/api/v1/calls/npf-test', {});
+          const r = res.data || {};
+          this.npfTestOk = !!r.ok;
+          if (r.ok) {
+            this.npfTestResult = `Connected ✓ (HTTP 200, ${r.ms}ms) — keys valid, server can reach NoPaperForms.`;
+          } else if (r.reason === 'not_configured') {
+            this.npfTestResult = 'Not configured — enter the keys first.';
+          } else if (r.reason === 'rejected') {
+            this.npfTestResult = `Reached NoPaperForms but it rejected the request (HTTP ${r.httpStatus}): ${r.message}. Check the keys.`;
+          } else {
+            this.npfTestResult = `Cannot reach NoPaperForms (${r.message}). The server's outbound HTTPS to api.nopaperforms.io is likely blocked.`;
+          }
+        } catch (e) {
+          this.npfTestOk = false;
+          this.npfTestResult = e.message;
+        } finally {
+          this.testingNpf = false;
+        }
       },
       async saveNpfConfig() {
         if (!this.npfForm.secret_key && !this.npfForm.access_key && !this.npfForm.activity_config_id) {
@@ -316,6 +358,7 @@
           if (npf) c.meta = { ...(c.meta || {}), npf };   // reflect persisted state on the row
           const r = result || {};
           if (r.activityId) alert(`Posted to NoPaperForms ✓\nActivity id: ${r.activityId}`);
+          else if (r.reason === 'error') alert(`Not posted — NoPaperForms error${r.httpStatus ? ` (HTTP ${r.httpStatus})` : ''}:\n${r.message || 'see server logs'}`);
           else if (r.skipped) alert(`Not posted — ${this.npfReason(r.reason)}.`);
           else alert('NoPaperForms sync triggered.');
         } catch (e) {

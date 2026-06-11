@@ -56,6 +56,12 @@ const npfStatus = asyncHandler(async (req, res) => {
   return success(res, { data: npfService.status() });
 });
 
+// Connectivity/credential check against NoPaperForms (Super Admin) so egress
+// and key validity can be confirmed independent of any specific lead.
+const npfTest = asyncHandler(async (req, res) =>
+  success(res, { data: await npfService.testConnection(req.body && req.body.mobile) })
+);
+
 // Save NoPaperForms credentials to the DB (Super Admin) so the integration can
 // be enabled from the app without server env access. Never echoes the secrets.
 const setNpfConfig = asyncHandler(async (req, res) => {
@@ -211,6 +217,7 @@ module.exports = {
   list,
   agents,
   npfStatus,
+  npfTest,
   setNpfConfig,
   show,
   postNpf,
