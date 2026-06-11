@@ -249,6 +249,23 @@ class NpfService {
    * "Lead details" button. Never throws — returns a structured result the UI
    * can render (record, lead id) or an error (rejected/unreachable).
    */
+  /** Pull the lead record out of the various shapes NPF may return. */
+  static pickRecord(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    let d = raw.data !== undefined ? raw.data : raw;
+    if (Array.isArray(d)) return d.length ? d[0] : null;
+    if (d && typeof d === 'object') {
+      // Direct lead object (has recognisable lead fields)?
+      const leadish = ['name', 'mobile', 'email', 'lead_stage', 'course', 'lead_id'];
+      if (leadish.some((k) => k in d)) return d;
+      // Otherwise it may be keyed by mobile/id → an object of objects.
+      const vals = Object.values(d).filter((v) => v && typeof v === 'object');
+      if (vals.length) return Array.isArray(vals[0]) ? vals[0][0] : vals[0];
+      return Object.keys(d).length ? d : null;
+    }
+    return null;
+  }
+
   async fetchLeadDetails(mobile, fields) {
     await this.refresh();
     if (!this.enabled) return { ok: false, reason: 'not_configured' };
@@ -256,13 +273,15 @@ class NpfService {
     if (!num) return { ok: false, reason: 'no_mobile' };
     try {
       const raw = await this.getDetailsByMobileNumber(num, fields);
-      const data = raw && (raw.data !== undefined ? raw.data : raw);
-      const record = Array.isArray(data) ? data[0] : data;
+      const record = NpfService.pickRecord(raw);
+      logger.info(`NPF lead lookup ${num}: ${record ? 'found' : 'no record'} — ${JSON.stringify(raw).slice(0, 500)}`);
       return {
         ok: true,
         mobile: num,
         leadId: NpfService.extractLeadId(raw),
         record: record && typeof record === 'object' ? record : null,
+        // Always include the raw response so the UI can show what NPF returned.
+        raw,
       };
     } catch (err) {
       const httpStatus = err.response ? err.response.status : null;
