@@ -23,7 +23,10 @@ class NpfService {
     if (this.enabled) {
       this.client = axios.create({
         baseURL: config.npf.baseUrl.replace(/\/+$/, ''),
-        timeout: 15000,
+        // Keep well under typical reverse-proxy/gateway timeouts: two calls
+        // (lookup + activity) can stack, so each must fail fast if NPF is slow
+        // or unreachable rather than hanging the request into a 502.
+        timeout: 8000,
         headers: {
           'Content-Type': 'application/json',
           'secret-key': config.npf.secretKey,
@@ -135,8 +138,14 @@ class NpfService {
     if (agent.npf_owner_id) return String(agent.npf_owner_id);
     const nameKey = String(agent.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
     if (!nameKey) return null;
-    const map = await db.NpfOwnerMap.findOne({ where: { name_key: nameKey } });
-    return map ? String(map.owner_id) : null;
+    try {
+      const map = await db.NpfOwnerMap.findOne({ where: { name_key: nameKey } });
+      return map ? String(map.owner_id) : null;
+    } catch (err) {
+      // Missing table / DB hiccup must not abort the sync — just skip assignment.
+      logger.warn(`NPF owner-id lookup failed for "${agent.name}": ${err.message}`);
+      return null;
+    }
   }
 
   /**

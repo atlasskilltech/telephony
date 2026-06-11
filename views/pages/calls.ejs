@@ -226,6 +226,7 @@
           no_mobile: 'no usable mobile number on this call',
           lead_not_found: 'no matching lead found in NoPaperForms for this number',
           error: 'NoPaperForms returned an error',
+          timeout: 'NoPaperForms did not respond in time (still finishing in the background — refresh to see the result)',
         })[reason] || reason || 'skipped';
       },
       async postNpf(c) {
