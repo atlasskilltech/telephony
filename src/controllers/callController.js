@@ -51,7 +51,22 @@ const uploadRecording = asyncHandler(async (req, res) => {
 
 // Live NoPaperForms integration status (non-secret) for the calls page, so the
 // UI reflects the running server's actual config rather than a stale render.
-const npfStatus = asyncHandler(async (req, res) => success(res, { data: npfService.status() }));
+const npfStatus = asyncHandler(async (req, res) => {
+  await npfService.refresh();
+  return success(res, { data: npfService.status() });
+});
+
+// Save NoPaperForms credentials to the DB (Super Admin) so the integration can
+// be enabled from the app without server env access. Never echoes the secrets.
+const setNpfConfig = asyncHandler(async (req, res) => {
+  const data = await npfService.saveConfig({
+    secretKey: req.body.secret_key,
+    accessKey: req.body.access_key,
+    activityConfigId: req.body.activity_config_id,
+    enabled: req.body.enabled,
+  });
+  return success(res, { data, message: 'NoPaperForms settings saved' });
+});
 
 // Active agents for the calls filter dropdown.
 const agents = asyncHandler(async (req, res) => {
@@ -196,6 +211,7 @@ module.exports = {
   list,
   agents,
   npfStatus,
+  setNpfConfig,
   show,
   postNpf,
   retryTranscription,

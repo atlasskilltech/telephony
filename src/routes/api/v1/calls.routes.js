@@ -24,6 +24,7 @@ const upload = multer({
 router.get('/', requirePermission('calls.view'), callController.list);
 router.get('/agents', requirePermission('calls.view'), callController.agents);
 router.get('/npf-status', requirePermission('calls.view'), callController.npfStatus);
+router.put('/npf-config', requirePermission('settings.update'), callController.setNpfConfig);
 router.post('/click-to-call', requirePermission('calls.create'), callController.clickToCall);
 router.post(
   '/upload-recording',

@@ -17,25 +17,103 @@ const db = require('../models');
  * Without secret/access keys the service runs in stub mode: every call is
  * logged and skipped so the analysis pipeline stays fully runnable in dev.
  */
+// SystemConfig keys (group 'npf') that override the env-based defaults, so the
+// integration can be enabled from the app UI without touching server env.
+const DB_KEYS = {
+  enabled: 'npf_enabled',
+  secretKey: 'npf_secret_key',
+  accessKey: 'npf_access_key',
+  activityConfigId: 'npf_activity_config_id',
+  baseUrl: 'npf_base_url',
+  timezone: 'npf_timezone',
+};
+
 class NpfService {
   constructor() {
-    this.enabled = config.npf.enabled && !!config.npf.secretKey && !!config.npf.accessKey;
-    if (this.enabled) {
-      this.client = axios.create({
-        baseURL: config.npf.baseUrl.replace(/\/+$/, ''),
-        // Keep well under typical reverse-proxy/gateway timeouts: two calls
-        // (lookup + activity) can stack, so each must fail fast if NPF is slow
-        // or unreachable rather than hanging the request into a 502.
-        timeout: 8000,
-        headers: {
-          'Content-Type': 'application/json',
-          'secret-key': config.npf.secretKey,
-          'access-key': config.npf.accessKey,
-        },
-      });
-    } else {
-      logger.warn('NPF service running in stub mode (no NPF_SECRET_KEY/NPF_ACCESS_KEY). Activities are skipped.');
+    // Start from env; DB overrides are merged in lazily via refresh().
+    this._apply(this._fromEnv());
+    this._loadedFromDb = false;
+    if (!this.enabled) {
+      logger.warn('NPF service starting without keys — will use DB-stored credentials if present, else stub mode.');
     }
+  }
+
+  _fromEnv() {
+    return {
+      enabled: config.npf.enabled,
+      baseUrl: config.npf.baseUrl,
+      secretKey: config.npf.secretKey,
+      accessKey: config.npf.accessKey,
+      activityConfigId: config.npf.activityConfigId,
+      timezone: config.npf.timezone,
+    };
+  }
+
+  /** Re-apply a resolved config, recomputing `enabled` and the axios client. */
+  _apply(cfg) {
+    this.cfg = cfg;
+    this.enabled = !!(cfg.enabled && cfg.secretKey && cfg.accessKey);
+    this.client = this.enabled
+      ? axios.create({
+          baseURL: String(cfg.baseUrl).replace(/\/+$/, ''),
+          // Keep well under typical gateway timeouts: lookup + activity can
+          // stack, so each must fail fast rather than hang into a 502.
+          timeout: 8000,
+          headers: {
+            'Content-Type': 'application/json',
+            'secret-key': cfg.secretKey,
+            'access-key': cfg.accessKey,
+          },
+        })
+      : null;
+  }
+
+  /** Merge SystemConfig (group 'npf') over env defaults and re-apply. */
+  async refresh() {
+    const env = this._fromEnv();
+    try {
+      const rows = await db.SystemConfig.findAll({ where: { group: 'npf' } });
+      const o = {};
+      rows.forEach((r) => { o[r.key] = r.value; });
+      const pick = (k, fallback) => {
+        const v = o[DB_KEYS[k]];
+        return v === undefined || v === null || v === '' ? fallback : v;
+      };
+      this._apply({
+        enabled: o[DB_KEYS.enabled] != null ? !!o[DB_KEYS.enabled] : env.enabled,
+        baseUrl: pick('baseUrl', env.baseUrl),
+        secretKey: pick('secretKey', env.secretKey),
+        accessKey: pick('accessKey', env.accessKey),
+        activityConfigId: pick('activityConfigId', env.activityConfigId),
+        timezone: pick('timezone', env.timezone),
+      });
+      this._loadedFromDb = true;
+    } catch (err) {
+      // Table missing / DB hiccup: keep env-based config.
+      this._apply(env);
+    }
+    return this.enabled;
+  }
+
+  /**
+   * Persist NoPaperForms credentials to SystemConfig (so they survive restarts
+   * and don't depend on server env), then refresh. Only non-empty fields are
+   * written, so a blank secret/access key leaves the stored value untouched.
+   */
+  async saveConfig({ secretKey, accessKey, activityConfigId, enabled } = {}) {
+    const set = async (key, value, isSecret = false) => {
+      const full = DB_KEYS[key];
+      const existing = await db.SystemConfig.findOne({ where: { key: full } });
+      if (existing) await existing.update({ value, group: 'npf', is_secret: isSecret });
+      else await db.SystemConfig.create({ key: full, value, group: 'npf', is_secret: isSecret });
+    };
+    const clean = (v) => (typeof v === 'string' ? v.trim() : v);
+    if (clean(secretKey)) await set('secretKey', clean(secretKey), true);
+    if (clean(accessKey)) await set('accessKey', clean(accessKey), true);
+    if (clean(activityConfigId)) await set('activityConfigId', clean(activityConfigId));
+    if (enabled !== undefined) await set('enabled', !!enabled);
+    await this.refresh();
+    return this.status();
   }
 
   /** Whether the NoPaperForms integration has usable credentials. */
@@ -48,14 +126,16 @@ class NpfService {
    * exactly why posting is/isn't enabled (e.g. which key the server is missing).
    */
   status() {
+    const c = this.cfg || this._fromEnv();
     return {
       enabled: this.enabled,
-      flagEnabled: config.npf.enabled,
-      hasSecretKey: !!config.npf.secretKey,
-      hasAccessKey: !!config.npf.accessKey,
-      baseUrl: config.npf.baseUrl,
-      activityConfigId: config.npf.activityConfigId,
-      timezone: config.npf.timezone,
+      flagEnabled: c.enabled,
+      hasSecretKey: !!c.secretKey,
+      hasAccessKey: !!c.accessKey,
+      source: this._loadedFromDb ? 'db+env' : 'env',
+      baseUrl: c.baseUrl,
+      activityConfigId: c.activityConfigId,
+      timezone: c.timezone,
     };
   }
 
@@ -67,9 +147,9 @@ class NpfService {
   }
 
   /** `YYYY-MM-DDTHH:MM` in the configured NPF timezone (default Asia/Kolkata). */
-  static formatActivityDate(date = new Date()) {
+  static formatActivityDate(date = new Date(), tz = config.npf.timezone) {
     const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: config.npf.timezone,
+      timeZone: tz,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -193,6 +273,8 @@ class NpfService {
    * @returns {Promise<{ skipped?: boolean, reason?: string, activityId?: string }>}
    */
   async syncCallActivity({ call, analysis, agent }) {
+    // Pick up DB-stored credentials without a restart.
+    await this.refresh();
     if (!this.enabled) return { skipped: true, reason: 'stub_mode' };
     try {
       // Outbound: the lead is the dialled (to) number; inbound: the caller.
@@ -227,7 +309,7 @@ class NpfService {
         // Update the existing activity (e.g. after a re-analysis/retry).
         response = await this.updateDynamicActivity({
           id: activityId,
-          activity_config_id: config.npf.activityConfigId,
+          activity_config_id: this.cfg.activityConfigId,
           ...(ownerId ? { activity_assign: ownerId } : {}),
           description,
           dynamic_fields: dynamicFields,
@@ -244,12 +326,15 @@ class NpfService {
           return { skipped: true, reason: 'lead_not_found' };
         }
         response = await this.createDynamicActivity({
-          activity_config_id: config.npf.activityConfigId,
+          activity_config_id: this.cfg.activityConfigId,
           search_criteria: leadId,
           lead_id: leadId,
           activity_date: {
-            timezone: config.npf.timezone,
-            date: NpfService.formatActivityDate(call.started_at ? new Date(call.started_at) : new Date()),
+            timezone: this.cfg.timezone,
+            date: NpfService.formatActivityDate(
+              call.started_at ? new Date(call.started_at) : new Date(),
+              this.cfg.timezone
+            ),
           },
           ...(ownerId ? { activity_assign: ownerId } : {}),
           description,
