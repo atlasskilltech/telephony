@@ -125,27 +125,39 @@ class NpfService {
    * Non-secret diagnostic view of the live config so the UI can tell the user
    * exactly why posting is/isn't enabled (e.g. which key the server is missing).
    */
+  // Masked hint (first 3 + last 4 + length) so an admin can verify which key
+  // is stored/sent without the full secret ever leaving the server.
+  static maskKey(v) {
+    if (!v) return null;
+    const s = String(v);
+    return s.length <= 8 ? `•••• (len ${s.length})` : `${s.slice(0, 3)}…${s.slice(-4)} (len ${s.length})`;
+  }
+
   status() {
     const c = this.cfg || this._fromEnv();
-    // Masked hint (first 3 + last 4) so an admin can verify which key is
-    // stored without the full secret ever leaving the server.
-    const mask = (v) => {
-      if (!v) return null;
-      const s = String(v);
-      return s.length <= 8 ? '••••' : `${s.slice(0, 3)}…${s.slice(-4)}`;
-    };
     return {
       enabled: this.enabled,
       flagEnabled: c.enabled,
       hasSecretKey: !!c.secretKey,
       hasAccessKey: !!c.accessKey,
-      secretKeyHint: mask(c.secretKey),
-      accessKeyHint: mask(c.accessKey),
+      secretKeyHint: NpfService.maskKey(c.secretKey),
+      accessKeyHint: NpfService.maskKey(c.accessKey),
       source: this._loadedFromDb ? 'db+env' : 'env',
       baseUrl: c.baseUrl,
       activityConfigId: c.activityConfigId,
       timezone: c.timezone,
     };
+  }
+
+  /** Remove DB-stored credentials so the service falls back to server env. */
+  async clearConfig() {
+    try {
+      await db.SystemConfig.destroy({ where: { group: 'npf' } });
+    } catch (err) {
+      logger.warn(`Failed to clear NPF DB config: ${err.message}`);
+    }
+    await this.refresh();
+    return this.status();
   }
 
   /** Last-10-digit local mobile (NPF stores numbers without a country code). */
@@ -396,19 +408,28 @@ class NpfService {
     await this.refresh();
     if (!this.enabled) return { ok: false, reason: 'not_configured' };
     const num = NpfService.normalizeMobile(mobile) || '9999999999';
+    // What's actually being transmitted (masked) so an admin can verify the
+    // stored values + lengths match the real keys from NoPaperForms.
+    const sent = {
+      endpoint: `${String(this.cfg.baseUrl).replace(/\/+$/, '')}/getDetailsByMobileNumber`,
+      secretKey: NpfService.maskKey(this.cfg.secretKey),
+      accessKey: NpfService.maskKey(this.cfg.accessKey),
+    };
     const started = Date.now();
     try {
       const data = await this.getDetailsByMobileNumber(num);
-      return {
-        ok: true,
-        httpStatus: 200,
-        ms: Date.now() - started,
-        leadFound: !!NpfService.extractLeadId(data),
-      };
+      return { ok: true, httpStatus: 200, ms: Date.now() - started, leadFound: !!NpfService.extractLeadId(data), sent };
     } catch (err) {
       const httpStatus = err.response ? err.response.status : null;
       const message = err.response ? JSON.stringify(err.response.data) : (err.code || err.message);
-      return { ok: false, reason: httpStatus ? 'rejected' : 'unreachable', httpStatus, message: String(message).slice(0, 300), ms: Date.now() - started };
+      return {
+        ok: false,
+        reason: httpStatus ? 'rejected' : 'unreachable',
+        httpStatus,
+        message: String(message).slice(0, 300),
+        ms: Date.now() - started,
+        sent,
+      };
     }
   }
 }
