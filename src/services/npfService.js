@@ -49,8 +49,31 @@ class NpfService {
     };
   }
 
+  /**
+   * Normalise a pasted key: trim whitespace and strip a single pair of
+   * surrounding quotes (a common copy/paste artifact — NoPaperForms keys never
+   * contain quotes, so sending `"abc"` instead of `abc` yields a 401).
+   */
+  static sanitizeKey(v) {
+    if (v == null) return v;
+    let s = String(v).trim();
+    if (
+      s.length >= 2 &&
+      ((s[0] === '"' && s[s.length - 1] === '"') || (s[0] === "'" && s[s.length - 1] === "'"))
+    ) {
+      s = s.slice(1, -1).trim();
+    }
+    return s;
+  }
+
   /** Re-apply a resolved config, recomputing `enabled` and the axios client. */
   _apply(cfg) {
+    // Sanitise keys regardless of source so stray quotes never reach NPF.
+    cfg = {
+      ...cfg,
+      secretKey: NpfService.sanitizeKey(cfg.secretKey),
+      accessKey: NpfService.sanitizeKey(cfg.accessKey),
+    };
     this.cfg = cfg;
     this.enabled = !!(cfg.enabled && cfg.secretKey && cfg.accessKey);
     this.client = this.enabled
@@ -108,8 +131,8 @@ class NpfService {
       else await db.SystemConfig.create({ key: full, value, group: 'npf', is_secret: isSecret });
     };
     const clean = (v) => (typeof v === 'string' ? v.trim() : v);
-    if (clean(secretKey)) await set('secretKey', clean(secretKey), true);
-    if (clean(accessKey)) await set('accessKey', clean(accessKey), true);
+    if (NpfService.sanitizeKey(secretKey)) await set('secretKey', NpfService.sanitizeKey(secretKey), true);
+    if (NpfService.sanitizeKey(accessKey)) await set('accessKey', NpfService.sanitizeKey(accessKey), true);
     if (clean(activityConfigId)) await set('activityConfigId', clean(activityConfigId));
     if (enabled !== undefined) await set('enabled', !!enabled);
     await this.refresh();
