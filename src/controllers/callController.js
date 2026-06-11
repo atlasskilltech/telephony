@@ -140,11 +140,17 @@ const postNpf = asyncHandler(async (req, res) => {
   if (!call.analysis || call.analysis.status !== 'completed') {
     throw ApiError.badRequest('Call has no completed analysis to post yet');
   }
-  const result = await npfService.syncCallActivity({
-    call,
-    analysis: call.analysis,
-    agent: call.agent,
+  // Bound the request: the sync makes outbound calls to NoPaperForms, so if
+  // that is slow/unreachable we still respond promptly (the sync keeps running
+  // in the background and persists its outcome to call.meta.npf) instead of
+  // hanging until the gateway returns a 502.
+  const timeout = new Promise((resolve) => {
+    setTimeout(() => resolve({ skipped: true, reason: 'timeout' }), 12000).unref();
   });
+  const result = await Promise.race([
+    npfService.syncCallActivity({ call, analysis: call.analysis, agent: call.agent }),
+    timeout,
+  ]);
   return success(res, {
     data: { result, npf: (call.meta && call.meta.npf) || null },
     message: 'NoPaperForms sync triggered',
