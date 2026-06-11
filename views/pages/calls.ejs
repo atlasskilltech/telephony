@@ -81,11 +81,11 @@
                 <span x-show="!retrying[c.id] && c.is_missed && (!c.analysis || c.analysis.status!=='completed')" class="text-slate-400 text-xs" title="No AI for missed calls">—</span>
                 <span x-show="!retrying[c.id] && !c.is_missed && (!c.analysis || (c.analysis.status!=='completed' && c.analysis.status!=='failed'))" class="text-slate-400 text-xs">pending</span>
                 <span x-show="!retrying[c.id] && !c.is_missed && c.analysis && c.analysis.status==='failed'" class="text-rose-500 text-xs">failed</span>
-                <button x-show="!retrying[c.id] && c.recording" @click="retry(c)"
-                  class="ml-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Retry</button>
-                <button x-show="!retrying[c.id] && c.analysis && c.analysis.status==='completed'" @click="postNpf(c)" :disabled="posting[c.id]"
+                <button type="button" x-show="!retrying[c.id] && c.recording" @click="retry(c)"
+                  class="ml-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-xs cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Retry</button>
+                <button type="button" x-show="!retrying[c.id] && c.analysis && c.analysis.status==='completed'" @click="postNpf(c)" :disabled="posting[c.id]"
                   title="Push transcript URL + scores to NoPaperForms"
-                  class="ml-1 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-500/40 text-indigo-600 dark:text-indigo-300 text-xs hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-50"
+                  class="ml-1 px-2 py-0.5 rounded-md bg-indigo-600 text-white text-xs font-medium cursor-pointer hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   x-text="posting[c.id] ? 'Posting…' : 'Post'"></button>
                 <div x-show="c.meta && c.meta.npf" class="text-[11px] mt-1" :class="npfColor(c)" x-text="npfLabel(c)"></div>
               </td>
