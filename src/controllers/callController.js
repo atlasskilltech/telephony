@@ -64,7 +64,12 @@ const npfTest = asyncHandler(async (req, res) =>
 
 // Save NoPaperForms credentials to the DB (Super Admin) so the integration can
 // be enabled from the app without server env access. Never echoes the secrets.
+// `clear: true` wipes DB-stored keys so it falls back to the server env.
 const setNpfConfig = asyncHandler(async (req, res) => {
+  if (req.body && req.body.clear) {
+    const data = await npfService.clearConfig();
+    return success(res, { data, message: 'NoPaperForms DB keys cleared (now using server env)' });
+  }
   const data = await npfService.saveConfig({
     secretKey: req.body.secret_key,
     accessKey: req.body.access_key,

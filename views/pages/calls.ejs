@@ -44,10 +44,12 @@
     <input x-model="npfForm.activity_config_id"
       :placeholder="'Activity config id (optional)' + (npfStatus.activityConfigId ? ' — current: ' + npfStatus.activityConfigId : '')"
       class="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none sm:col-span-2" />
-    <div class="sm:col-span-2 flex items-center gap-2">
+    <div class="sm:col-span-2 flex flex-wrap items-center gap-2">
       <button type="button" @click="saveNpfConfig()" :disabled="savingNpf"
         class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium cursor-pointer hover:bg-emerald-700 disabled:opacity-50"
         x-text="savingNpf ? 'Saving…' : 'Save & enable'"></button>
+      <button type="button" @click="clearNpfConfig()" :disabled="savingNpf"
+        class="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-xs cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50">Clear saved keys</button>
       <span class="text-xs text-slate-500">Stored securely in the database; used immediately, no restart.</span>
     </div>
   </div>
@@ -242,12 +244,13 @@
           const res = await api.post('/api/v1/calls/npf-test', {});
           const r = res.data || {};
           this.npfTestOk = !!r.ok;
+          const sent = r.sent ? ` [sent → secret ${r.sent.secretKey}, access ${r.sent.accessKey}]` : '';
           if (r.ok) {
-            this.npfTestResult = `Connected ✓ (HTTP 200, ${r.ms}ms) — keys valid, server can reach NoPaperForms.`;
+            this.npfTestResult = `Connected ✓ (HTTP 200, ${r.ms}ms) — keys valid, server can reach NoPaperForms.${sent}`;
           } else if (r.reason === 'not_configured') {
             this.npfTestResult = 'Not configured — enter the keys first.';
           } else if (r.reason === 'rejected') {
-            this.npfTestResult = `Reached NoPaperForms but it rejected the request (HTTP ${r.httpStatus}): ${r.message}. Check the keys.`;
+            this.npfTestResult = `Reached NoPaperForms but it rejected the keys (HTTP ${r.httpStatus}): ${r.message}.${sent} — verify these match your NoPaperForms keys exactly (and that the server IP is whitelisted).`;
           } else {
             this.npfTestResult = `Cannot reach NoPaperForms (${r.message}). The server's outbound HTTPS to api.nopaperforms.io is likely blocked.`;
           }
@@ -256,6 +259,21 @@
           this.npfTestResult = e.message;
         } finally {
           this.testingNpf = false;
+        }
+      },
+      async clearNpfConfig() {
+        if (!confirm('Clear the NoPaperForms keys saved in the database? The integration will fall back to the server environment keys (if any).')) return;
+        this.savingNpf = true;
+        try {
+          const res = await api.put('/api/v1/calls/npf-config', { clear: true });
+          this.npfStatus = res.data || {};
+          this.npfEnabled = !!this.npfStatus.enabled;
+          this.npfForm = { secret_key: '', access_key: '', activity_config_id: '' };
+          alert(this.npfEnabled ? 'DB keys cleared — now using server env keys.' : 'DB keys cleared — no env keys present, so posting is now disabled.');
+        } catch (e) {
+          alert(e.message);
+        } finally {
+          this.savingNpf = false;
         }
       },
       async saveNpfConfig() {
