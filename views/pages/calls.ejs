@@ -385,7 +385,12 @@
             else alert(`Could not reach NoPaperForms: ${r.message || ''}`);
             return;
           }
-          if (!r.record) { alert(`No NoPaperForms lead found for ${r.mobile}.`); return; }
+          if (!r.record) {
+            // Show what NoPaperForms actually returned so an empty/odd shape is visible.
+            const raw = r.raw ? JSON.stringify(r.raw, null, 2).slice(0, 1500) : '(empty)';
+            alert(`No structured lead found for ${r.mobile}.\n\nNoPaperForms returned:\n${raw}`);
+            return;
+          }
           const lines = Object.entries(r.record)
             .map(([k, v]) => `${k}: ${v && typeof v === 'object' ? JSON.stringify(v) : (v ?? '—')}`);
           alert(`NoPaperForms lead — ${r.mobile}\nLead id: ${r.leadId || '—'}\n\n${lines.join('\n')}`);
