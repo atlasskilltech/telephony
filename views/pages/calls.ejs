@@ -83,6 +83,11 @@
                 <span x-show="!retrying[c.id] && !c.is_missed && c.analysis && c.analysis.status==='failed'" class="text-rose-500 text-xs">failed</span>
                 <button x-show="!retrying[c.id] && c.recording" @click="retry(c)"
                   class="ml-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">Retry</button>
+                <button x-show="!retrying[c.id] && c.analysis && c.analysis.status==='completed'" @click="postNpf(c)" :disabled="posting[c.id]"
+                  title="Push transcript URL + scores to NoPaperForms"
+                  class="ml-1 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-500/40 text-indigo-600 dark:text-indigo-300 text-xs hover:bg-indigo-50 dark:hover:bg-indigo-500/10 disabled:opacity-50"
+                  x-text="posting[c.id] ? 'Posting…' : 'Post'"></button>
+                <div x-show="c.meta && c.meta.npf" class="text-[11px] mt-1" :class="npfColor(c)" x-text="npfLabel(c)"></div>
               </td>
               <td class="px-4 py-3 text-right">
                 <button x-show="c.recording" @click="play(c)"
@@ -136,6 +141,7 @@
       filters: { range: 'today', from: '', to: '', agentId: '', search: '' },
       agents: [],
       retrying: {},
+      posting: {},
       async init() {
         await this.load();
         this.loadAgents();
@@ -212,6 +218,45 @@
           this.retrying[c.id] = false;
           alert(e.message);
         }
+      },
+      // ---- NoPaperForms manual post + status ----
+      npfReason(reason) {
+        return ({
+          stub_mode: 'NoPaperForms keys are not configured (stub mode)',
+          no_mobile: 'no usable mobile number on this call',
+          lead_not_found: 'no matching lead found in NoPaperForms for this number',
+          error: 'NoPaperForms returned an error',
+        })[reason] || reason || 'skipped';
+      },
+      async postNpf(c) {
+        this.posting[c.id] = true;
+        try {
+          const res = await api.post(`/api/v1/calls/${c.id}/npf-sync`);
+          const { result, npf } = res.data || {};
+          if (npf) c.meta = { ...(c.meta || {}), npf };   // reflect persisted state on the row
+          const r = result || {};
+          if (r.activityId) alert(`Posted to NoPaperForms ✓\nActivity id: ${r.activityId}`);
+          else if (r.skipped) alert(`Not posted — ${this.npfReason(r.reason)}.`);
+          else alert('NoPaperForms sync triggered.');
+        } catch (e) {
+          alert(e.message);
+        } finally {
+          this.posting[c.id] = false;
+        }
+      },
+      npfLabel(c) {
+        const n = c.meta && c.meta.npf;
+        if (!n) return '';
+        if (n.status === 'synced') return `NPF ✓ ${n.action || 'sent'}${n.activityId ? ' #' + n.activityId : ''}`;
+        if (n.status === 'failed') return `NPF failed${n.lastErrorStatus ? ' (HTTP ' + n.lastErrorStatus + ')' : ''}`;
+        if (n.status === 'skipped') return `NPF skipped: ${this.npfReason(n.reason)}`;
+        return 'NPF: pending';
+      },
+      npfColor(c) {
+        const s = c.meta && c.meta.npf && c.meta.npf.status;
+        return s === 'synced' ? 'text-emerald-600'
+          : s === 'failed' ? 'text-rose-500'
+          : s === 'skipped' ? 'text-amber-600' : 'text-slate-400';
       },
     };
   };

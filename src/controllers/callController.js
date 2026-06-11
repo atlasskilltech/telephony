@@ -3,6 +3,7 @@
 const { Op } = require('sequelize');
 const telephonyService = require('../services/telephonyService');
 const storageService = require('../services/storageService');
+const npfService = require('../services/npfService');
 const db = require('../models');
 const { success, created, paginate } = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
@@ -125,6 +126,31 @@ const show = asyncHandler(async (req, res) => {
   return success(res, { data: call });
 });
 
+// Manually push (or re-push) the call's analysis to NoPaperForms. Returns the
+// outcome plus the persisted call.meta.npf state so the UI can show whether the
+// Dynamic Activity was created/updated, skipped or failed (with the reason).
+const postNpf = asyncHandler(async (req, res) => {
+  const call = await db.CallLog.findByPk(req.params.id, {
+    include: [
+      { model: db.CallAnalysis, as: 'analysis' },
+      { model: db.User, as: 'agent' },
+    ],
+  });
+  if (!call) throw ApiError.notFound('Call not found');
+  if (!call.analysis || call.analysis.status !== 'completed') {
+    throw ApiError.badRequest('Call has no completed analysis to post yet');
+  }
+  const result = await npfService.syncCallActivity({
+    call,
+    analysis: call.analysis,
+    agent: call.agent,
+  });
+  return success(res, {
+    data: { result, npf: (call.meta && call.meta.npf) || null },
+    message: 'NoPaperForms sync triggered',
+  });
+});
+
 // Re-queue transcription + analysis for an existing recording (no re-upload).
 const retryTranscription = asyncHandler(async (req, res) => {
   await telephonyService.retryTranscription(Number(req.params.id));
@@ -160,6 +186,7 @@ module.exports = {
   list,
   agents,
   show,
+  postNpf,
   retryTranscription,
   recordingUrl,
   streamRecording,
