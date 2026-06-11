@@ -58,6 +58,26 @@ class UserService {
     return role;
   }
 
+  // Normalise a name for matching against npf_owner_map.name_key.
+  static _nameKey(name) {
+    return String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Resolve a user's NPF owner id: an explicit value (manual override) wins,
+   * otherwise fall back to the seeded name -> owner-id mapping. Returns
+   * `undefined` when nothing matches so callers can leave the column untouched.
+   */
+  async _resolveNpfOwnerId(name, explicit) {
+    if (explicit !== undefined && explicit !== null && explicit !== '') {
+      return String(explicit).trim();
+    }
+    const nameKey = UserService._nameKey(name);
+    if (!nameKey) return undefined;
+    const map = await db.NpfOwnerMap.findOne({ where: { name_key: nameKey } });
+    return map ? String(map.owner_id) : undefined;
+  }
+
   async create(payload, actor) {
     const name = String(payload.name || '').trim();
     const email = String(payload.email || '').toLowerCase().trim();
@@ -70,6 +90,8 @@ class UserService {
     const role = await this._resolveRole(payload);
     // Google-only sign-in: no password needed — store a random one.
     const password = payload.password || crypto.randomBytes(24).toString('hex');
+    // Attach the NPF owner id (explicit override, else name mapping).
+    const npfOwnerId = await this._resolveNpfOwnerId(name, payload.npf_owner_id);
 
     const user = await db.User.create({
       name,
@@ -78,6 +100,7 @@ class UserService {
       password,
       role_id: role.id,
       agent_extension: payload.agent_extension || null,
+      npf_owner_id: npfOwnerId ?? null,
       team_leader_id: payload.team_leader_id || null,
       status: payload.status || 'active',
       created_by: actor ? actor.id : null,
@@ -98,6 +121,18 @@ class UserService {
       changes.role_id = role.id;
     }
     if (payload.password) changes.password = payload.password;
+
+    // NPF owner id: explicit override always applies; otherwise, when the user
+    // has none yet, try to resolve it from the (possibly updated) name.
+    if (payload.npf_owner_id !== undefined) {
+      changes.npf_owner_id = await this._resolveNpfOwnerId(
+        changes.name ?? user.name,
+        payload.npf_owner_id
+      ) ?? null;
+    } else if (!user.npf_owner_id) {
+      const resolved = await this._resolveNpfOwnerId(changes.name ?? user.name);
+      if (resolved) changes.npf_owner_id = resolved;
+    }
 
     await user.update(changes);
     return this.findById(id);

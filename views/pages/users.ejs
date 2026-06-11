@@ -26,6 +26,7 @@
               <td class="px-4 py-3">
                 <div class="font-medium" x-text="u.name"></div>
                 <div class="text-xs text-slate-400" x-show="u.phone" x-text="u.phone"></div>
+                <div class="text-[11px] text-slate-400" x-show="u.npf_owner_id" x-text="'NPF #' + u.npf_owner_id"></div>
               </td>
               <td class="px-4 py-3" x-text="u.email"></td>
               <td class="px-4 py-3" x-text="u.role ? u.role.name : '—'"></td>
@@ -81,6 +82,8 @@
           <template x-for="r in roles" :key="r.id"><option :value="r.slug" x-text="r.name"></option></template>
         </select>
         <input x-model="form.agent_extension" placeholder="Agent extension (optional)" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none" />
+        <input x-model="form.npf_owner_id" placeholder="NPF owner ID / Level 2 ID (optional)" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none" />
+        <p class="text-xs text-slate-500 -mt-1">Leave blank to auto-match by name from the NPF owner mapping.</p>
         <select x-show="editId" x-model="form.status" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none">
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
@@ -100,7 +103,7 @@
     return {
       users: [], roles: [], meta: {}, page: 1, loading: true,
       search: '', showCreate: false, saving: false, error: '', editId: null,
-      form: { name: '', email: '', phone: '', role_slug: '', agent_extension: '', status: 'active' },
+      form: { name: '', email: '', phone: '', role_slug: '', agent_extension: '', npf_owner_id: '', status: 'active' },
       async init() {
         await Promise.all([this.load(), this.loadRoles()]);
       },
@@ -133,6 +136,7 @@
           phone: u.phone || '',
           role_slug: u.role ? u.role.slug : '',
           agent_extension: u.agent_extension || '',
+          npf_owner_id: u.npf_owner_id || '',
           status: u.status || 'active',
         };
         this.showCreate = true;
@@ -150,6 +154,7 @@
               phone: this.form.phone,
               role_slug: this.form.role_slug,
               agent_extension: this.form.agent_extension,
+              npf_owner_id: this.form.npf_owner_id,
               status: this.form.status,
             });
           } else {

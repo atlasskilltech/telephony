@@ -80,6 +80,15 @@ const doLogout = asyncHandler(async (req, res) => {
   return res.redirect('/login');
 });
 
+// Public, login-free call report. Renders a standalone page that hydrates from
+// the public API using the call uuid in the URL.
+const publicReport = (req, res) =>
+  res.render('pages/publicReport', {
+    title: 'Call report',
+    layout: 'layouts/public',
+    uuid: req.params.uuid,
+  });
+
 // Authenticated pages — req.user is set by the web authenticate middleware.
 const page = (view, title) => (req, res) =>
   res.render(`pages/${view}`, { title, user: req.user, roleSlug: req.roleSlug, active: view });
@@ -90,6 +99,7 @@ module.exports = {
   googleStart,
   googleCallback,
   doLogout,
+  publicReport,
   dashboard: page('dashboard', 'Dashboard'),
   leads: page('leads', 'Call Database'),
   pipeline: page('pipeline', 'Pipeline'),

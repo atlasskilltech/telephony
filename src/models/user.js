@@ -52,6 +52,10 @@ module.exports = (sequelize) => {
       team_leader_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       // Telephony agent extension/SIP id for click-to-call dialling.
       agent_extension: { type: DataTypes.STRING(40), allowNull: true },
+      // NoPaperForms owner id ("Level 2 ID") — used as activity_assign when
+      // pushing the post-call Dynamic Activity. Resolved from npf_owner_map by
+      // name, or set explicitly on the user.
+      npf_owner_id: { type: DataTypes.STRING(60), allowNull: true },
       avatar_url: { type: DataTypes.STRING(255), allowNull: true },
       // Free-form JSON for per-user settings, e.g. assignment specialisations
       // { courses: [...], cities: [...] } used by AssignmentService.

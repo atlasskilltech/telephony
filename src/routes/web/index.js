@@ -18,6 +18,10 @@ router.get('/google/callback', webController.googleCallback);
 router.post('/logout', webController.doLogout);
 router.get('/logout', webController.doLogout);
 
+// Public, login-free call report (shared into NoPaperForms). Access is gated
+// by the unguessable call uuid; data is fetched from /api/v1/public/calls/:uuid.
+router.get('/r/:uuid', webController.publicReport);
+
 // Authenticated dashboard pages.
 router.get('/dashboard', auth, webController.dashboard);
 router.get('/leads', auth, webController.leads);

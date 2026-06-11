@@ -14,14 +14,16 @@ const notificationRoutes = require('./notifications.routes');
 const reportRoutes = require('./reports.routes');
 const profileRoutes = require('./profile.routes');
 const userRoutes = require('./users.routes');
+const publicRoutes = require('./public.routes');
 
 const router = express.Router();
 
 router.get('/health', (req, res) => res.json({ success: true, status: 'ok', ts: Date.now() }));
 
-// Public: authentication + provider webhooks.
+// Public: authentication + provider webhooks + login-free call report.
 router.use('/auth', authRoutes);
 router.use('/telephony', telephonyRoutes);
+router.use('/public', publicRoutes);
 
 // Everything below requires a valid access token.
 router.use(authenticate());

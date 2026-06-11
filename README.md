@@ -183,11 +183,45 @@ and builds the Docker image on `main`.
 - DevOps: Docker (multi-stage), Compose, Nginx, PM2, CI
 
 **Stubbed / integration points** (logged + DB-tracked, swap in provider creds)
+- NoPaperForms (NPF) lead CRM: after each call is analysed the lead is looked
+  up by mobile and a **Dynamic Activity** is pushed (create, or update on
+  retry) carrying a public transcript URL + call scores, assigned to the
+  counselor's NPF owner id. Runs in stub mode without `NPF_SECRET_KEY` /
+  `NPF_ACCESS_KEY`. See [NoPaperForms integration](#nopaperforms-npf-integration).
 - Email (SMTP/nodemailer) and WhatsApp Business API senders run in stub mode
   without credentials
 - Knowlarity/MyOperator/Ozonetel telephony adapters follow the Exotel reference
   and can be added to the provider registry
 - Whisper speaker diarisation uses a segment-order heuristic
+
+---
+
+## NoPaperForms (NPF) integration
+
+After the AI pipeline finishes analysing a call, the system pushes the result
+back to the NoPaperForms lead CRM so counselors see it on the lead timeline.
+
+**Flow** (`src/services/npfService.js`, fired from the analysis job):
+
+1. Look the lead up by mobile — `POST /lead/v1/getDetailsByMobileNumber`.
+2. Build a **public, login-free report URL**: `${APP_URL}/r/<call-uuid>`
+   (served by `GET /r/:uuid` → `GET /api/v1/public/calls/:uuid`). Access is
+   gated by the unguessable call uuid; the dialled number is masked.
+3. Push a **Dynamic Activity** with the transcript URL + scores:
+   - first time → `POST /lead/v1/postDynamicActivity/`
+   - on a re-analysis/retry → `POST /lead/v1/updateDynamicActivity/`
+     (the returned activity id is stored on `call.meta.npf`).
+   - `dynamic_fields` = `{ cf_call_transcript_url, cf_call_scores }`;
+     `activity_assign` = the counselor's NPF owner id.
+
+**Owner ids.** The admission team's Level-2 export (name → owner id) is seeded
+into `npf_owner_map`. A user's `npf_owner_id` is resolved from that mapping by
+name when the account is created/updated, or set explicitly in the Users page.
+No accounts are created from the export — it is purely a name → owner-id table.
+
+Configure via `NPF_*` in `.env` (see `.env.example`). Without
+`NPF_SECRET_KEY`/`NPF_ACCESS_KEY` the integration runs in stub mode (logged +
+skipped) and never blocks or fails the analysis job.
 
 ---
 
