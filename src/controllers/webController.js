@@ -102,6 +102,7 @@ const calls = (req, res) =>
     roleSlug: req.roleSlug,
     active: 'calls',
     npfEnabled: require('../services/npfService').isConfigured(),
+    isSuperAdmin: req.roleSlug === 'super_admin',
   });
 
 module.exports = {
