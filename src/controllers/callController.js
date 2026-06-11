@@ -187,6 +187,17 @@ const postNpf = asyncHandler(async (req, res) => {
   });
 });
 
+// On-demand NoPaperForms lead lookup for a call's number (the "Lead details"
+// button). Uses the dialled number (outbound) or caller (inbound).
+const npfLeadDetails = asyncHandler(async (req, res) => {
+  const call = await db.CallLog.findByPk(req.params.id, {
+    attributes: ['id', 'direction', 'to_number', 'from_number'],
+  });
+  if (!call) throw ApiError.notFound('Call not found');
+  const mobile = call.direction === 'inbound' ? call.from_number : call.to_number;
+  return success(res, { data: await npfService.fetchLeadDetails(mobile) });
+});
+
 // Re-queue transcription + analysis for an existing recording (no re-upload).
 const retryTranscription = asyncHandler(async (req, res) => {
   await telephonyService.retryTranscription(Number(req.params.id));
@@ -226,6 +237,7 @@ module.exports = {
   setNpfConfig,
   show,
   postNpf,
+  npfLeadDetails,
   retryTranscription,
   recordingUrl,
   streamRecording,

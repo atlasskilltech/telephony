@@ -244,6 +244,38 @@ class NpfService {
     return key ? String(record[key]) : null;
   }
 
+  /**
+   * Fetch + normalise a lead's NoPaperForms details by mobile, for the on-demand
+   * "Lead details" button. Never throws — returns a structured result the UI
+   * can render (record, lead id) or an error (rejected/unreachable).
+   */
+  async fetchLeadDetails(mobile, fields) {
+    await this.refresh();
+    if (!this.enabled) return { ok: false, reason: 'not_configured' };
+    const num = NpfService.normalizeMobile(mobile);
+    if (!num) return { ok: false, reason: 'no_mobile' };
+    try {
+      const raw = await this.getDetailsByMobileNumber(num, fields);
+      const data = raw && (raw.data !== undefined ? raw.data : raw);
+      const record = Array.isArray(data) ? data[0] : data;
+      return {
+        ok: true,
+        mobile: num,
+        leadId: NpfService.extractLeadId(raw),
+        record: record && typeof record === 'object' ? record : null,
+      };
+    } catch (err) {
+      const httpStatus = err.response ? err.response.status : null;
+      const message = err.response ? JSON.stringify(err.response.data) : (err.code || err.message);
+      return {
+        ok: false,
+        reason: httpStatus ? 'rejected' : 'unreachable',
+        httpStatus,
+        message: String(message).slice(0, 300),
+      };
+    }
+  }
+
   async getDetailsByMobileNumber(mobile, fields = ['name', 'mobile', 'lead_stage', 'email', 'course']) {
     const normalized = NpfService.normalizeMobile(mobile);
     if (!this.enabled || !normalized) return null;
