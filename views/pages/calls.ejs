@@ -374,31 +374,37 @@
       },
       // ---- NoPaperForms lead lookup ----
       async getLead(c) {
+        // Disable only while the request is in flight (prevents a double-tap),
+        // then re-enable BEFORE the blocking alert so the button is never left
+        // looking disabled while the result popup is open.
+        if (this.loadingLead[c.id]) return;
         this.loadingLead[c.id] = true;
+        let res, err;
         try {
-          const res = await api.get(`/api/v1/calls/${c.id}/npf-lead`);
-          const r = res.data || {};
-          if (!r.ok) {
-            if (r.reason === 'not_configured') alert('NoPaperForms is not configured yet.');
-            else if (r.reason === 'no_mobile') alert('This call has no usable phone number.');
-            else if (r.reason === 'rejected') alert(`NoPaperForms rejected the request (HTTP ${r.httpStatus}): ${r.message}`);
-            else alert(`Could not reach NoPaperForms: ${r.message || ''}`);
-            return;
-          }
-          if (!r.record) {
-            // Show what NoPaperForms actually returned so an empty/odd shape is visible.
-            const raw = r.raw ? JSON.stringify(r.raw, null, 2).slice(0, 1500) : '(empty)';
-            alert(`No structured lead found for ${r.mobile}.\n\nNoPaperForms returned:\n${raw}`);
-            return;
-          }
-          const lines = Object.entries(r.record)
-            .map(([k, v]) => `${k}: ${v && typeof v === 'object' ? JSON.stringify(v) : (v ?? '—')}`);
-          alert(`NoPaperForms lead — ${r.mobile}\nLead id: ${r.leadId || '—'}\n\n${lines.join('\n')}`);
+          res = await api.get(`/api/v1/calls/${c.id}/npf-lead`);
         } catch (e) {
-          alert(e.message);
-        } finally {
-          this.loadingLead[c.id] = false;
+          err = e;
         }
+        this.loadingLead[c.id] = false;
+        await this.$nextTick();   // let Alpine drop the disabled attribute first
+        if (err) { alert(err.message); return; }
+        const r = res.data || {};
+        if (!r.ok) {
+          if (r.reason === 'not_configured') alert('NoPaperForms is not configured yet.');
+          else if (r.reason === 'no_mobile') alert('This call has no usable phone number.');
+          else if (r.reason === 'rejected') alert(`NoPaperForms rejected the request (HTTP ${r.httpStatus}): ${r.message}`);
+          else alert(`Could not reach NoPaperForms: ${r.message || ''}`);
+          return;
+        }
+        if (!r.record) {
+          // Show what NoPaperForms actually returned so an empty/odd shape is visible.
+          const raw = r.raw ? JSON.stringify(r.raw, null, 2).slice(0, 1500) : '(empty)';
+          alert(`No structured lead found for ${r.mobile}.\n\nNoPaperForms returned:\n${raw}`);
+          return;
+        }
+        const lines = Object.entries(r.record)
+          .map(([k, v]) => `${k}: ${v && typeof v === 'object' ? JSON.stringify(v) : (v ?? '—')}`);
+        alert(`NoPaperForms lead — ${r.mobile}\nLead id: ${r.leadId || '—'}\n\n${lines.join('\n')}`);
       },
       // ---- NoPaperForms manual post + status ----
       npfReason(reason) {
@@ -411,21 +417,27 @@
         })[reason] || reason || 'skipped';
       },
       async postNpf(c) {
+        // Disable only while the post is in flight (so a double-tap can't create
+        // a duplicate NoPaperForms activity), then re-enable BEFORE the blocking
+        // alert so the button doesn't look stuck while the popup is open.
+        if (this.posting[c.id]) return;
         this.posting[c.id] = true;
+        let res, err;
         try {
-          const res = await api.post(`/api/v1/calls/${c.id}/npf-sync`);
-          const { result, npf } = res.data || {};
-          if (npf) c.meta = { ...(c.meta || {}), npf };   // reflect persisted state on the row
-          const r = result || {};
-          if (r.activityId) alert(`Posted to NoPaperForms ✓\nActivity id: ${r.activityId}`);
-          else if (r.reason === 'error') alert(`Not posted — NoPaperForms error${r.httpStatus ? ` (HTTP ${r.httpStatus})` : ''}:\n${r.message || 'see server logs'}`);
-          else if (r.skipped) alert(`Not posted — ${this.npfReason(r.reason)}.`);
-          else alert('NoPaperForms sync triggered.');
+          res = await api.post(`/api/v1/calls/${c.id}/npf-sync`);
         } catch (e) {
-          alert(e.message);
-        } finally {
-          this.posting[c.id] = false;
+          err = e;
         }
+        this.posting[c.id] = false;
+        await this.$nextTick();   // let Alpine drop the disabled attribute first
+        if (err) { alert(err.message); return; }
+        const { result, npf } = res.data || {};
+        if (npf) c.meta = { ...(c.meta || {}), npf };   // reflect persisted state on the row
+        const r = result || {};
+        if (r.activityId) alert(`Posted to NoPaperForms ✓\nActivity id: ${r.activityId}`);
+        else if (r.reason === 'error') alert(`Not posted — NoPaperForms error${r.httpStatus ? ` (HTTP ${r.httpStatus})` : ''}:\n${r.message || 'see server logs'}`);
+        else if (r.skipped) alert(`Not posted — ${this.npfReason(r.reason)}.`);
+        else alert('NoPaperForms sync triggered.');
       },
       npfLabel(c) {
         const n = c.meta && c.meta.npf;
