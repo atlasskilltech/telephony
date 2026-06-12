@@ -68,10 +68,20 @@ module.exports = async function analysisJob(job) {
     }
     logger.info(`Analysed call ${callId}: interest ${a.interest_score}, sentiment ${a.sentiment}`);
 
-    // Push the public transcript URL + scores to NoPaperForms. This is a
-    // best-effort side effect — npfService never throws, so a CRM outage or
-    // missing lead does not fail (or re-run) the analysis job.
-    await npfService.syncCallActivity({ call, analysis: analysisRow, agent: call.agent });
+    // Auto-post the public transcript URL + scores to NoPaperForms as soon as
+    // the AI report is generated — the same syncCallActivity the manual "Post"
+    // button calls. Best-effort: guard it so a CRM outage, timeout or any
+    // unexpected error can never fail or re-run a successful analysis job.
+    try {
+      const npfResult = await npfService.syncCallActivity({
+        call,
+        analysis: analysisRow,
+        agent: call.agent,
+      });
+      logger.info(`NPF auto-post for call ${callId}: ${JSON.stringify(npfResult)}`);
+    } catch (npfErr) {
+      logger.error(`NPF auto-post for call ${callId} errored (ignored): ${npfErr.message}`);
+    }
   } catch (err) {
     await analysisRow.update({ status: 'failed', error: err.message.slice(0, 500) });
     throw err;
