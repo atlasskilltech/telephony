@@ -335,17 +335,47 @@ class NpfService {
     return data;
   }
 
+  /**
+   * POST to a write endpoint with full request/response logging so a gateway
+   * 403 (or any failure) can be diagnosed from the app log alone: we log the
+   * exact URL + payload sent, and on the way back the HTTP status, response
+   * headers (Server/Location/WAF markers) and the raw body — the detail that
+   * tells a trailing-slash redirect apart from a WAF block apart from an API
+   * validation error. Re-throws so the caller's error handling is unchanged.
+   */
+  async _postActivity(path, payload) {
+    const base = String(this.cfg.baseUrl).replace(/\/+$/, '');
+    logger.info(`NPF → POST ${base}${path} :: ${JSON.stringify(payload)}`);
+    try {
+      const res = await this.client.post(path, payload);
+      logger.info(`NPF ← ${path} HTTP ${res.status} :: ${JSON.stringify(res.data).slice(0, 2000)}`);
+      return res.data;
+    } catch (err) {
+      if (err.response) {
+        const body = typeof err.response.data === 'string'
+          ? err.response.data
+          : JSON.stringify(err.response.data);
+        logger.error(
+          `NPF ← ${path} HTTP ${err.response.status} FAILED`
+          + ` :: headers=${JSON.stringify(err.response.headers || {}).slice(0, 800)}`
+          + ` :: body=${String(body).slice(0, 2000)}`
+        );
+      } else {
+        logger.error(`NPF ← ${path} no response (${err.code || err.message})`);
+      }
+      throw err;
+    }
+  }
+
   async createDynamicActivity(payload) {
     // No trailing slash: the NPF gateway answers a trailing-slash path with a
     // plain nginx 403 HTML page (the lookup endpoint /getDetailsByMobileNumber
     // has none and works), which previously looked like an IP-whitelist block.
-    const { data } = await this.client.post('/postDynamicActivity', payload);
-    return data;
+    return this._postActivity('/postDynamicActivity', payload);
   }
 
   async updateDynamicActivity(payload) {
-    const { data } = await this.client.post('/updateDynamicActivity', payload);
-    return data;
+    return this._postActivity('/updateDynamicActivity', payload);
   }
 
   /**
