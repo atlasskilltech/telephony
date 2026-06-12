@@ -105,9 +105,10 @@
               <td class="px-4 py-3">
                 <div class="font-medium" x-text="c.lead?.student?.first_name || c.to_number"></div>
                 <div class="text-xs text-slate-400" x-show="c.lead?.student?.first_name" x-text="c.to_number"></div>
-                <button type="button" @click="getLead(c)" :disabled="loadingLead[c.id]"
+                <button type="button" @click="getLead(c)"
                   title="Look up this number in NoPaperForms"
-                  class="mt-1 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                  class="mt-1 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                  :class="loadingLead[c.id] ? 'opacity-60' : ''"
                   x-text="loadingLead[c.id] ? 'Looking up…' : 'Lead details'"></button>
               </td>
               <td class="px-4 py-3" x-text="c.agent?.name || '—'"></td>
@@ -142,10 +143,10 @@
                 <span x-show="!retrying[c.id] && !c.is_missed && c.analysis && c.analysis.status==='failed'" class="text-rose-500 text-xs">failed</span>
                 <button type="button" x-show="!retrying[c.id] && c.recording" @click="retry(c)"
                   class="ml-2 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-xs cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">Retry</button>
-                <button type="button" x-show="!retrying[c.id] && c.analysis && c.analysis.status==='completed'" @click="postNpf(c)" :disabled="posting[c.id]"
+                <button type="button" x-show="!retrying[c.id] && c.analysis && c.analysis.status==='completed'" @click="postNpf(c)"
                   :title="npfEnabled ? 'Push transcript URL + scores to NoPaperForms' : 'NoPaperForms is not configured — set NPF keys to enable'"
-                  class="ml-1 px-2 py-0.5 rounded-md text-white text-xs font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="npfEnabled ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-400 hover:bg-slate-500'"
+                  class="ml-1 px-2 py-0.5 rounded-md text-white text-xs font-medium cursor-pointer"
+                  :class="(npfEnabled ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-400 hover:bg-slate-500') + (posting[c.id] ? ' opacity-60' : '')"
                   x-text="posting[c.id] ? 'Posting…' : 'Post'"></button>
                 <button type="button" x-show="c.meta && c.meta.npf" @click="npfDetails(c)"
                   title="View NoPaperForms log" class="block text-[11px] mt-1 underline decoration-dotted cursor-pointer"
