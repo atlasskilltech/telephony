@@ -451,8 +451,7 @@ class NpfService {
         // Bare overall score (e.g. "85") — the cf_call_scores field is numeric;
         // the full per-parameter breakdown lives in `description`.
         cf_call_scores: String(NpfService.overallScore(analysis)),
-        // Attribute the call to the counselor by name as well as via
-        // activity_assign (owner id), which some NPF views key off.
+        // Attribute the call to the counselor by name.
         ...(agent && agent.name ? { cf_called_by: String(agent.name) } : {}),
       };
 
@@ -465,7 +464,6 @@ class NpfService {
         response = await this.updateDynamicActivity({
           id: activityId,
           activity_config_id: this.cfg.activityConfigId,
-          ...(ownerId ? { activity_assign: ownerId } : {}),
           description,
           dynamic_fields: dynamicFields,
         });
@@ -493,7 +491,6 @@ class NpfService {
               this.cfg.timezone
             ),
           },
-          ...(ownerId ? { activity_assign: ownerId } : {}),
           description,
           dynamic_fields: dynamicFields,
         });
