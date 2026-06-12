@@ -133,6 +133,27 @@ describe('NpfService helpers', () => {
     });
   });
 
+  describe('activityDate (ERROR[602] future-time fix)', () => {
+    it('treats a bare DB string as IST wall-clock, not UTC (no +5:30 shift)', () => {
+      // The exact shape call.started_at has under dateStrings:true. A past date
+      // is returned as-is — never shifted forward into 15:53 etc.
+      expect(NpfService.activityDate('2020-01-15 10:30:45')).toBe('2020-01-15T10:30');
+    });
+    it('clamps a future started_at to now (never sends a future time)', () => {
+      const out = NpfService.activityDate('2999-01-01 00:00:00');
+      expect(out.startsWith('2999')).toBe(false);
+      // Clamped to ~now — the current year, in valid YYYY-MM-DDTHH:MM shape.
+      expect(out).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+      expect(out.slice(0, 4)).toBe(NpfService.formatActivityDate(new Date()).slice(0, 4));
+    });
+    it('honours an ISO string that already carries a zone', () => {
+      expect(NpfService.activityDate('2021-03-02T00:00:00Z')).toBe('2021-03-02T05:30');
+    });
+    it('falls back to now when started_at is missing', () => {
+      expect(NpfService.activityDate(null)).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    });
+  });
+
   describe('transcriptUrl', () => {
     it('builds a /r/:uuid url from the app url', () => {
       const url = NpfService.transcriptUrl({ uuid: 'abc-123' });

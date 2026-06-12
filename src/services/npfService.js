@@ -227,6 +227,35 @@ class NpfService {
   }
 
   /**
+   * Build the NPF `activity_date.date` for a call — the real call time, never
+   * in the future (NPF rejects future times with ERROR[602]).
+   *
+   * `call.started_at` comes back as a bare connection-timezone string (the DB is
+   * read with dateStrings:true at timezone '+05:30' — see config/database.js),
+   * e.g. '2026-06-12 17:09:11'. That string is already the IST wall-clock we
+   * want; it must be parsed AS +05:30, not passed to new Date() on a UTC server
+   * (which reads it as UTC and shifts it +5:30 into the future). The resulting
+   * instant is clamped to 'now' and rendered in the NPF timezone.
+   */
+  static activityDate(startedAt, tz = config.npf.timezone) {
+    const DB_TZ = '+05:30'; // must match the sequelize connection timezone
+    let ms;
+    if (
+      typeof startedAt === 'string' &&
+      /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(startedAt.trim())
+    ) {
+      // Bare 'YYYY-MM-DD HH:MM[:SS]' with no zone → it's DB-timezone wall-clock.
+      ms = Date.parse(`${startedAt.trim().replace(' ', 'T')}${DB_TZ}`);
+    } else if (startedAt) {
+      // A Date, or an ISO string that already carries a zone.
+      ms = new Date(startedAt).getTime();
+    }
+    const now = Date.now();
+    if (!Number.isFinite(ms) || ms > now) ms = now;
+    return NpfService.formatActivityDate(new Date(ms), tz);
+  }
+
+  /**
    * Public, login-free report URL for a call (posted as cf_call_transcript_url).
    * Built from npf.publicBaseUrl so it can be a clean https domain: NPF's
    * gateway/WAF 403s a raw IP:port URL in the body (an RFI signature), so a
@@ -547,10 +576,7 @@ class NpfService {
           lead_id: leadId,
           activity_date: {
             timezone: this.cfg.timezone,
-            date: NpfService.formatActivityDate(
-              call.started_at ? new Date(call.started_at) : new Date(),
-              this.cfg.timezone
-            ),
+            date: NpfService.activityDate(call.started_at, this.cfg.timezone),
           },
           description,
           dynamic_fields: dynamicFields,
