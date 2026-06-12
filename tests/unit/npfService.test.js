@@ -55,6 +55,26 @@ describe('NpfService helpers', () => {
     });
   });
 
+  describe('toFlag', () => {
+    it('treats blank/undefined as the fallback (so a stray flag never disables keys)', () => {
+      expect(NpfService.toFlag(undefined, true)).toBe(true);
+      expect(NpfService.toFlag(null, true)).toBe(true);
+      expect(NpfService.toFlag('', true)).toBe(true);
+    });
+    it('honours real booleans', () => {
+      expect(NpfService.toFlag(false, true)).toBe(false);
+      expect(NpfService.toFlag(true, false)).toBe(true);
+    });
+    it('parses the usual truthy/falsy strings', () => {
+      expect(NpfService.toFlag('true', false)).toBe(true);
+      expect(NpfService.toFlag('1', false)).toBe(true);
+      expect(NpfService.toFlag('on', false)).toBe(true);
+      expect(NpfService.toFlag('false', true)).toBe(false);
+      expect(NpfService.toFlag('0', true)).toBe(false);
+      expect(NpfService.toFlag('no', true)).toBe(false);
+    });
+  });
+
   describe('extractLeadId', () => {
     it('reads lead_id from a data array', () => {
       expect(NpfService.extractLeadId({ data: [{ lead_id: 42 }] })).toBe('42');

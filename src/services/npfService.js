@@ -91,6 +91,18 @@ class NpfService {
       : null;
   }
 
+  /**
+   * Coerce a stored/env flag to a boolean. Handles real booleans, the usual
+   * truthy strings ('1','true','yes','on') and treats blank/undefined as the
+   * given fallback — so a stray empty `npf_enabled` row never disables a
+   * fully-configured integration.
+   */
+  static toFlag(v, fallback) {
+    if (v === undefined || v === null || v === '') return fallback;
+    if (typeof v === 'boolean') return v;
+    return ['1', 'true', 'yes', 'on'].includes(String(v).toLowerCase());
+  }
+
   /** Merge SystemConfig (group 'npf') over env defaults and re-apply. */
   async refresh() {
     const env = this._fromEnv();
@@ -102,11 +114,20 @@ class NpfService {
         const v = o[DB_KEYS[k]];
         return v === undefined || v === null || v === '' ? fallback : v;
       };
+      // Whoever actually supplies the secret/access key pair owns the enable
+      // flag. This keeps the in-app (DB-stored) flow working while ensuring a
+      // leftover DB row can never silently disable keys configured via env
+      // (the env-managed deployment) — and vice-versa.
+      const dbSecret = NpfService.sanitizeKey(pick('secretKey', ''));
+      const dbAccess = NpfService.sanitizeKey(pick('accessKey', ''));
+      const dbManaged = !!(dbSecret && dbAccess);
       this._apply({
-        enabled: o[DB_KEYS.enabled] != null ? !!o[DB_KEYS.enabled] : env.enabled,
+        enabled: dbManaged
+          ? NpfService.toFlag(o[DB_KEYS.enabled], true)
+          : NpfService.toFlag(env.enabled, true),
         baseUrl: pick('baseUrl', env.baseUrl),
-        secretKey: pick('secretKey', env.secretKey),
-        accessKey: pick('accessKey', env.accessKey),
+        secretKey: dbManaged ? dbSecret : env.secretKey,
+        accessKey: dbManaged ? dbAccess : env.accessKey,
         activityConfigId: pick('activityConfigId', env.activityConfigId),
         timezone: pick('timezone', env.timezone),
       });

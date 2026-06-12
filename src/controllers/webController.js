@@ -95,15 +95,20 @@ const page = (view, title) => (req, res) =>
 
 // Calls page also needs to know whether the NoPaperForms integration is
 // configured, so the UI can reflect/disable the manual "Post" action.
-const calls = (req, res) =>
+// Refresh from env + DB first so the very first paint is accurate (the page
+// also re-checks via /npf-status, but that round-trip can be slow/blocked).
+const calls = asyncHandler(async (req, res) => {
+  const npfService = require('../services/npfService');
+  await npfService.refresh();
   res.render('pages/calls', {
     title: 'Call Details',
     user: req.user,
     roleSlug: req.roleSlug,
     active: 'calls',
-    npfEnabled: require('../services/npfService').isConfigured(),
+    npfEnabled: npfService.isConfigured(),
     isSuperAdmin: req.roleSlug === 'super_admin',
   });
+});
 
 module.exports = {
   loginPage,
