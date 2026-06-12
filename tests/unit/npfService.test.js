@@ -140,6 +140,30 @@ describe('NpfService helpers', () => {
     });
   });
 
+  describe('sanitizeText (WAF-safe description)', () => {
+    it('drops pipes and the non-ASCII middle dot that trip the NPF gateway', () => {
+      const out = NpfService.sanitizeText('AI call analysis · Overall 85/100 | sentiment positive');
+      expect(out).not.toMatch(/[|·]/);
+      expect(out).toContain('Overall 85/100');
+      expect(out).toContain('sentiment positive');
+    });
+    it('strips angle brackets/backticks and collapses whitespace', () => {
+      expect(NpfService.sanitizeText('  <b>hi</b>  `x`  ')).toBe('b hi /b x');
+    });
+    it('returns empty string for nullish input', () => {
+      expect(NpfService.sanitizeText(null)).toBe('');
+      expect(NpfService.sanitizeText(undefined)).toBe('');
+    });
+  });
+
+  describe('buildScores separator', () => {
+    it('joins sections with a hyphen, never a pipe', () => {
+      const s = NpfService.buildScores({ call_quality_score: 85, sentiment: 'positive' });
+      expect(s).not.toContain('|');
+      expect(s).toBe('Overall 85/100 - sentiment positive');
+    });
+  });
+
   describe('write endpoints (403 / post-data regression)', () => {
     it('posts createDynamicActivity to a path with no trailing slash', async () => {
       const post = jest.fn().mockResolvedValue({ data: { id: 'act1' } });
