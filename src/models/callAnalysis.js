@@ -49,7 +49,13 @@ module.exports = (sequelize) => {
       sequelize,
       modelName: 'CallAnalysis',
       tableName: 'call_analysis',
-      indexes: [{ fields: ['call_id'] }, { fields: ['sentiment'] }, { fields: ['status'] }],
+      // call_id is UNIQUE: exactly one AI report per call (see migration
+      // 20260612120000-call-analysis-unique-call-id).
+      indexes: [
+        { fields: ['call_id'], unique: true, name: 'call_analysis_call_id_uq' },
+        { fields: ['sentiment'] },
+        { fields: ['status'] },
+      ],
     }
   );
 
