@@ -339,6 +339,28 @@ class NpfService {
     return data;
   }
 
+  /**
+   * Turn a raw HTTP error into a short, actionable message. A plain HTML
+   * "403 Forbidden" (an nginx/gateway block page rather than a JSON API error)
+   * almost always means this server's outbound IP is not allow-listed for the
+   * write endpoints — read/lookup uses the same keys and works, so it isn't a
+   * credential problem. Returns null when there's nothing useful to add.
+   */
+  static describeHttpError(status, data) {
+    const body = typeof data === 'string' ? data : JSON.stringify(data || '');
+    const looksHtml = /<html|<\/html>|<title>\s*\d{3}|Forbidden|Bad Gateway|Gateway Time-out/i.test(body);
+    if (looksHtml && (status === 403 || status === 401)) {
+      return `HTTP ${status} gateway block from NoPaperForms (not an API error). `
+        + 'Lead lookup uses the same keys and works, so the credentials are valid. '
+        + "Ask NoPaperForms to whitelist this server's outbound IP for the "
+        + 'postDynamicActivity / updateDynamicActivity APIs.';
+    }
+    if (looksHtml && status >= 500) {
+      return `HTTP ${status} from the NoPaperForms gateway (temporary upstream error) — retry shortly.`;
+    }
+    return null;
+  }
+
   /** Pull an activity id out of a create/update response. */
   static extractActivityId(payload) {
     if (!payload) return null;
@@ -483,17 +505,20 @@ class NpfService {
       // visible/queryable without trawling logs.
       const httpStatus = err.response ? err.response.status : null;
       const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+      const hint = NpfService.describeHttpError(httpStatus, err.response && err.response.data);
       logger.error(
-        `NPF activity sync failed for call ${call.id}${httpStatus ? ` [HTTP ${httpStatus}]` : ''}: ${detail}`
+        `NPF activity sync failed for call ${call.id}${httpStatus ? ` [HTTP ${httpStatus}]` : ''}: ${hint || detail}`
       );
       await NpfService.recordState(call, {
         status: 'failed',
         reason: 'error',
         lastErrorStatus: httpStatus,
-        lastError: String(detail).slice(0, 1000),
+        // Store the actionable hint when we have one, but keep the raw body too
+        // so the underlying gateway response is never lost for debugging.
+        lastError: String(hint ? `${hint} | raw: ${detail}` : detail).slice(0, 1000),
         lastErrorAt: new Date().toISOString(),
       });
-      return { skipped: true, reason: 'error', httpStatus, message: String(detail).slice(0, 300) };
+      return { skipped: true, reason: 'error', httpStatus, message: (hint || String(detail)).slice(0, 300) };
     }
   }
 

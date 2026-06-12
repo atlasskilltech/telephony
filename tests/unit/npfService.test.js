@@ -99,6 +99,21 @@ describe('NpfService helpers', () => {
     });
   });
 
+  describe('describeHttpError', () => {
+    const htmlForbidden = '<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n</body>\r\n</html>\r\n';
+    it('flags an HTML 403 gateway block as an IP-whitelist issue', () => {
+      const msg = NpfService.describeHttpError(403, htmlForbidden);
+      expect(msg).toMatch(/whitelist/i);
+      expect(msg).toMatch(/outbound IP/i);
+    });
+    it('returns null for a normal JSON API error', () => {
+      expect(NpfService.describeHttpError(400, { error: 'bad activity_config_id' })).toBeNull();
+    });
+    it('describes an HTML 5xx as a temporary upstream error', () => {
+      expect(NpfService.describeHttpError(502, '<html><title>502 Bad Gateway</title></html>')).toMatch(/temporary/i);
+    });
+  });
+
   describe('formatActivityDate', () => {
     it('formats as YYYY-MM-DDTHH:MM in Asia/Kolkata', () => {
       // 2026-06-11T00:00Z -> 05:30 IST
