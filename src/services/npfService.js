@@ -253,11 +253,14 @@ class NpfService {
     return parts.join(' | ');
   }
 
-  /** Best-effort extraction of an NPF lead id from a variety of response shapes. */
+  /**
+   * Best-effort extraction of an NPF lead id from a variety of response shapes.
+   * Resolves the actual lead record first (NPF often returns it keyed by mobile
+   * number, e.g. `{ data: { "8999421165": { lead_id: … } } }`), then reads the
+   * id off that record — so a found lead is never mistaken for "not found".
+   */
   static extractLeadId(payload) {
-    if (!payload) return null;
-    const data = payload.data ?? payload;
-    const record = Array.isArray(data) ? data[0] : data;
+    const record = NpfService.pickRecord(payload);
     if (!record || typeof record !== 'object') return null;
     const key = ['lead_id', 'leadId', 'id', 'user_id', 'userId'].find(
       (k) => record[k] != null && record[k] !== ''

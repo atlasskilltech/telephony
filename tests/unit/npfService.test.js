@@ -85,6 +85,18 @@ describe('NpfService helpers', () => {
     it('returns null when nothing matches', () => {
       expect(NpfService.extractLeadId({ data: [] })).toBeNull();
     });
+    it('drills into a mobile-keyed record (the lead_not_found regression)', () => {
+      const payload = {
+        data: {
+          '8999421165': {
+            name: 'Shreyash Chavan',
+            mobile: '8999421165',
+            lead_id: 'a416925433a6473d94272044ea71e6ea',
+          },
+        },
+      };
+      expect(NpfService.extractLeadId(payload)).toBe('a416925433a6473d94272044ea71e6ea');
+    });
   });
 
   describe('formatActivityDate', () => {
