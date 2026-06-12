@@ -330,12 +330,15 @@ class NpfService {
   }
 
   async createDynamicActivity(payload) {
-    const { data } = await this.client.post('/postDynamicActivity/', payload);
+    // No trailing slash: the NPF gateway answers a trailing-slash path with a
+    // plain nginx 403 HTML page (the lookup endpoint /getDetailsByMobileNumber
+    // has none and works), which previously looked like an IP-whitelist block.
+    const { data } = await this.client.post('/postDynamicActivity', payload);
     return data;
   }
 
   async updateDynamicActivity(payload) {
-    const { data } = await this.client.post('/updateDynamicActivity/', payload);
+    const { data } = await this.client.post('/updateDynamicActivity', payload);
     return data;
   }
 
@@ -468,7 +471,9 @@ class NpfService {
         }
         response = await this.createDynamicActivity({
           activity_config_id: this.cfg.activityConfigId,
-          search_criteria: leadId,
+          // `search_criteria` names the field NPF should match on — it is the
+          // literal 'lead_id', NOT the id value (which goes in `lead_id`).
+          search_criteria: 'lead_id',
           lead_id: leadId,
           activity_date: {
             timezone: this.cfg.timezone,

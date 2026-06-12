@@ -128,4 +128,44 @@ describe('NpfService helpers', () => {
       expect(url).toMatch(/\/r\/abc-123$/);
     });
   });
+
+  describe('write endpoints (403 / post-data regression)', () => {
+    it('posts createDynamicActivity to a path with no trailing slash', async () => {
+      const post = jest.fn().mockResolvedValue({ data: { id: 'act1' } });
+      const svc = new NpfService();
+      svc.client = { post };
+      await svc.createDynamicActivity({ lead_id: 'x' });
+      expect(post).toHaveBeenCalledWith('/postDynamicActivity', { lead_id: 'x' });
+    });
+
+    it('posts updateDynamicActivity to a path with no trailing slash', async () => {
+      const post = jest.fn().mockResolvedValue({ data: { id: 'act1' } });
+      const svc = new NpfService();
+      svc.client = { post };
+      await svc.updateDynamicActivity({ id: 'act1' });
+      expect(post).toHaveBeenCalledWith('/updateDynamicActivity', { id: 'act1' });
+    });
+
+    it('sends search_criteria as the literal "lead_id", with the id in lead_id', async () => {
+      const post = jest.fn((url) =>
+        url === '/getDetailsByMobileNumber'
+          ? Promise.resolve({ data: { data: { '6263469021': { lead_id: 'LID9' } } } })
+          : Promise.resolve({ data: { id: 'act1' } })
+      );
+      const svc = new NpfService();
+      svc.enabled = true;
+      svc.refresh = jest.fn().mockResolvedValue(true);
+      svc.cfg = { activityConfigId: 'cfg', timezone: 'Asia/Kolkata' };
+      svc.client = { post };
+      svc.resolveOwnerId = jest.fn().mockResolvedValue(null);
+
+      const call = { id: 1, uuid: 'u1', direction: 'outbound', to_number: '6263469021', meta: {}, update: jest.fn() };
+      await svc.syncCallActivity({ call, analysis: {}, agent: { name: 'A' } });
+
+      const createCall = post.mock.calls.find((c) => c[0] === '/postDynamicActivity');
+      expect(createCall).toBeDefined();
+      expect(createCall[1].search_criteria).toBe('lead_id');
+      expect(createCall[1].lead_id).toBe('LID9');
+    });
+  });
 });
