@@ -40,6 +40,17 @@ describe('NpfService helpers', () => {
     });
   });
 
+  describe('overallScore', () => {
+    it('rounds the first present score field', () => {
+      expect(NpfService.overallScore({ call_quality_score: 84.6 })).toBe(85);
+      expect(NpfService.overallScore({ agent_score: 70 })).toBe(70);
+    });
+    it('defaults to 0 when nothing is present', () => {
+      expect(NpfService.overallScore(null)).toBe(0);
+      expect(NpfService.overallScore({})).toBe(0);
+    });
+  });
+
   describe('sanitizeKey', () => {
     it('strips surrounding double quotes (the 401 cause)', () => {
       expect(NpfService.sanitizeKey('"e3abc078"')).toBe('e3abc078');
@@ -160,12 +171,15 @@ describe('NpfService helpers', () => {
       svc.resolveOwnerId = jest.fn().mockResolvedValue(null);
 
       const call = { id: 1, uuid: 'u1', direction: 'outbound', to_number: '6263469021', meta: {}, update: jest.fn() };
-      await svc.syncCallActivity({ call, analysis: {}, agent: { name: 'A' } });
+      await svc.syncCallActivity({ call, analysis: { call_quality_score: 85 }, agent: { name: 'Urvashi' } });
 
       const createCall = post.mock.calls.find((c) => c[0] === '/postDynamicActivity');
       expect(createCall).toBeDefined();
       expect(createCall[1].search_criteria).toBe('lead_id');
       expect(createCall[1].lead_id).toBe('LID9');
+      // cf_call_scores is a bare numeric string; cf_called_by is the agent name.
+      expect(createCall[1].dynamic_fields.cf_call_scores).toBe('85');
+      expect(createCall[1].dynamic_fields.cf_called_by).toBe('Urvashi');
     });
   });
 });

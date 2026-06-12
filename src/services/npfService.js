@@ -232,12 +232,18 @@ class NpfService {
     return `${base}/r/${call.uuid}`;
   }
 
-  /** Compact, human-readable score string for cf_call_scores. */
-  static buildScores(analysis) {
-    if (!analysis) return '';
-    const overall = Math.round(
+  /** Overall 0-100 call score (rounded), from whichever score field is present. */
+  static overallScore(analysis) {
+    if (!analysis) return 0;
+    return Math.round(
       Number(analysis.call_quality_score ?? analysis.agent_score ?? analysis.interest_score ?? 0)
     );
+  }
+
+  /** Compact, human-readable score string (used for the activity description). */
+  static buildScores(analysis) {
+    if (!analysis) return '';
+    const overall = NpfService.overallScore(analysis);
     const parts = [`Overall ${overall}/100`];
     let qa = analysis.qa_scores;
     if (typeof qa === 'string') {
@@ -442,7 +448,12 @@ class NpfService {
       const description = `AI call analysis · ${scores}`.slice(0, 1000);
       const dynamicFields = {
         cf_call_transcript_url: transcriptUrl,
-        cf_call_scores: scores,
+        // Bare overall score (e.g. "85") — the cf_call_scores field is numeric;
+        // the full per-parameter breakdown lives in `description`.
+        cf_call_scores: String(NpfService.overallScore(analysis)),
+        // Attribute the call to the counselor by name as well as via
+        // activity_assign (owner id), which some NPF views key off.
+        ...(agent && agent.name ? { cf_called_by: String(agent.name) } : {}),
       };
 
       const prior = (call.meta && call.meta.npf) || {};
