@@ -59,13 +59,22 @@ class StorageService {
     return { driver: 'local', key, url: fullPath };
   }
 
-  async getObjectStream(key) {
+  /**
+   * Readable stream for an object. Pass `{ start, end }` (inclusive byte
+   * offsets) to fetch a partial range — used to serve HTTP Range requests so
+   * audio players can seek without downloading the whole file.
+   */
+  async getObjectStream(key, range = null) {
+    const hasRange = range && Number.isFinite(range.start) && Number.isFinite(range.end);
     if (this.driver === 's3') {
       const { GetObjectCommand } = require('@aws-sdk/client-s3');
-      const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      const params = { Bucket: this.bucket, Key: key };
+      if (hasRange) params.Range = `bytes=${range.start}-${range.end}`;
+      const res = await this.s3.send(new GetObjectCommand(params));
       return res.Body;
     }
-    return fs.createReadStream(path.join(config.storage.localPath, key));
+    const opts = hasRange ? { start: range.start, end: range.end } : undefined;
+    return fs.createReadStream(path.join(config.storage.localPath, key), opts);
   }
 
   async getObjectBuffer(key) {

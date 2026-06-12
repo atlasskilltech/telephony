@@ -10,5 +10,6 @@ const router = express.Router();
  * not a session — used by the shareable, login-free call report page.
  */
 router.get('/calls/:uuid', publicController.callReport);
+router.get('/calls/:uuid/recording', publicController.callRecording);
 
 module.exports = router;

@@ -105,7 +105,7 @@ window.callReportMixin = function callReportMixin() {
     open: false, loading: false, hasAnalysis: false, a: {},
     score: 0, scoreColor: '#888', band: '', title: '', subtitle: '',
     params: [], turns: [], arc: [], positive: [], negative: [], improvements: [],
-    recommendations: [], colorFor: scoreColor,
+    recommendations: [], recordingUrl: null, colorFor: scoreColor,
   });
 
   return {
@@ -126,6 +126,7 @@ window.callReportMixin = function callReportMixin() {
       if (!a || a.status !== 'completed') { this.report = r; return; }
       r.hasAnalysis = true;
       r.a = a;
+      r.recordingUrl = call.recording_url || null;
       r.score = Math.round(num(a.call_quality_score) ?? num(a.agent_score) ?? num(a.interest_score) ?? 0);
       r.scoreColor = scoreColor(r.score);
       r.band = r.score >= 80 ? 'Strong call — minor coaching'
