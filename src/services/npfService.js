@@ -226,10 +226,38 @@ class NpfService {
     return `${g('year')}-${g('month')}-${g('day')}T${g('hour')}:${g('minute')}`;
   }
 
-  /** Public, login-free report URL for a call (posted as cf_call_transcript_url). */
+  /**
+   * Public, login-free report URL for a call (posted as cf_call_transcript_url).
+   * Built from npf.publicBaseUrl so it can be a clean https domain: NPF's
+   * gateway/WAF 403s a raw IP:port URL in the body (an RFI signature), so a
+   * misconfigured base that resolves to a bare IP is logged as a warning.
+   */
   static transcriptUrl(call) {
-    const base = config.app.url.replace(/\/+$/, '');
+    const base = String(config.npf.publicBaseUrl || config.app.url).replace(/\/+$/, '');
+    if (/^https?:\/\/(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/|$)/i.test(base)) {
+      logger.warn(
+        `NPF transcript URL uses a raw IP base (${base}); NoPaperForms' gateway may 403 this. `
+        + 'Set NPF_PUBLIC_BASE_URL (or APP_URL) to the public https domain.'
+      );
+    }
     return `${base}/r/${call.uuid}`;
+  }
+
+  /**
+   * Strip characters that NPF's WAF/gateway treats as attack signatures (pipes,
+   * angle brackets, backticks, backslashes) and fold non-ASCII punctuation, so a
+   * benign description never trips a 403 body-inspection block. Collapses
+   * whitespace and trims.
+   */
+  static sanitizeText(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/[·•]/g, '-')        // non-ASCII bullets/dots -> hyphen
+      .replace(/[|<>`\\]/g, ' ')     // WAF-flagged metacharacters -> space
+      // eslint-disable-next-line no-control-regex
+      .replace(/[^\x09\x20-\x7E]/g, '') // drop remaining non-ASCII
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /** Overall 0-100 call score (rounded), from whichever score field is present. */
@@ -256,7 +284,8 @@ class NpfService {
       if (detail) parts.push(detail);
     }
     if (analysis.sentiment) parts.push(`sentiment ${analysis.sentiment}`);
-    return parts.join(' | ');
+    // Join with a hyphen, not a pipe: '|' is a WAF command-injection signature.
+    return parts.join(' - ');
   }
 
   /**
@@ -475,14 +504,16 @@ class NpfService {
       const transcriptUrl = NpfService.transcriptUrl(call);
       const scores = NpfService.buildScores(analysis);
       const ownerId = await this.resolveOwnerId(agent);
-      const description = `AI call analysis · ${scores}`.slice(0, 1000);
+      // Sanitize free text: NPF's gateway 403s a body carrying WAF-flagged
+      // characters (pipes, non-ASCII punctuation), so keep description ASCII.
+      const description = NpfService.sanitizeText(`AI call analysis - ${scores}`).slice(0, 1000);
       const dynamicFields = {
         cf_call_transcript_url: transcriptUrl,
         // Bare overall score (e.g. "85") — the cf_call_scores field is numeric;
         // the full per-parameter breakdown lives in `description`.
         cf_call_scores: String(NpfService.overallScore(analysis)),
         // Attribute the call to the counselor by name.
-        ...(agent && agent.name ? { cf_called_by: String(agent.name) } : {}),
+        ...(agent && agent.name ? { cf_called_by: NpfService.sanitizeText(agent.name) } : {}),
       };
 
       const prior = (call.meta && call.meta.npf) || {};

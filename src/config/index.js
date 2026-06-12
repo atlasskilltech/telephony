@@ -117,6 +117,11 @@ const config = {
     accessKey: process.env.NPF_ACCESS_KEY || '',
     activityConfigId: process.env.NPF_ACTIVITY_CONFIG_ID || 'm6lAGd4b9NqZIpD2IKZzf6OLeXMJ2B7Q',
     timezone: process.env.NPF_TIMEZONE || 'Asia/Kolkata',
+    // Public base URL used to build the cf_call_transcript_url posted to NPF.
+    // Must be a real domain over https — NPF's gateway/WAF rejects a raw
+    // IP:port URL (e.g. http://1.2.3.4:4444/...) with a 403 (RFI signature),
+    // so this falls back to APP_URL but should be set to the public domain.
+    publicBaseUrl: process.env.NPF_PUBLIC_BASE_URL || process.env.APP_URL || 'http://localhost:3000',
   },
 };
 
