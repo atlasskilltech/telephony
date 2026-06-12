@@ -50,6 +50,14 @@
       </template>
     </div>
 
+    <!-- Call recording -->
+    <template x-if="report.recordingUrl">
+      <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4 mb-4">
+        <div class="text-sm font-medium mb-3">Call recording</div>
+        <audio class="w-full" controls preload="none" :src="report.recordingUrl"></audio>
+      </div>
+    </template>
+
     <!-- Transcript + sentiment arc -->
     <div class="grid lg:grid-cols-[1.3fr_1fr] gap-4 mb-4">
       <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4">

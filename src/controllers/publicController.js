@@ -1,6 +1,8 @@
 'use strict';
 
 const db = require('../models');
+const storageService = require('../services/storageService');
+const { audioMime } = require('../utils/mime');
 const { success } = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
@@ -24,6 +26,7 @@ const callReport = asyncHandler(async (req, res) => {
     include: [
       { model: db.CallTranscript, as: 'transcript' },
       { model: db.CallAnalysis, as: 'analysis' },
+      { model: db.CallRecording, as: 'recording' },
       { model: db.Lead, as: 'lead', include: [{ model: db.Student, as: 'student' }] },
     ],
   });
@@ -33,6 +36,7 @@ const callReport = asyncHandler(async (req, res) => {
   if (!a || a.status !== 'completed') throw ApiError.notFound('Report is not ready yet');
 
   const t = call.transcript;
+  const rec = call.recording;
   const student = call.lead && call.lead.student;
 
   // Shape mirrors what callReportMixin.buildReport() expects, sanitised.
@@ -45,6 +49,9 @@ const callReport = asyncHandler(async (req, res) => {
     duration_seconds: call.duration_seconds,
     to_number: maskNumber(call.to_number),
     lead: student ? { student: { first_name: student.first_name } } : null,
+    // Login-free audio: only expose the stream URL (keyed by the same uuid),
+    // never the storage key. Null when there's no archived recording to play.
+    recording_url: rec && rec.storage_key ? `/api/v1/public/calls/${call.uuid}/recording` : null,
     transcript: t ? { segments: t.segments, text: t.text } : null,
     analysis: {
       status: a.status,
@@ -68,4 +75,49 @@ const callReport = asyncHandler(async (req, res) => {
   return success(res, { data });
 });
 
-module.exports = { callReport };
+/**
+ * Public, login-free audio stream for a call recording — gated by the same
+ * unguessable uuid as the report (no auth, no storage key exposed). Streams the
+ * archived file from local disk or S3 via the storage service. Supports a
+ * single Range request so browsers can seek within the recording.
+ */
+const callRecording = asyncHandler(async (req, res) => {
+  const call = await db.CallLog.findOne({
+    where: { uuid: req.params.uuid },
+    attributes: ['id'],
+    include: [{ model: db.CallRecording, as: 'recording' }],
+  });
+  const rec = call && call.recording;
+  if (!rec || !rec.storage_key) throw ApiError.notFound('Recording not available');
+
+  res.setHeader('Content-Type', audioMime(rec.storage_key));
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Accept-Ranges', 'bytes');
+
+  const size = Number(rec.file_size_bytes) || null;
+  const range = req.headers.range;
+  // Honour a simple "bytes=start-end" range so seeking works; fall back to the
+  // whole file when the size is unknown or no range was requested.
+  if (range && size) {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (m) {
+      const start = m[1] ? parseInt(m[1], 10) : 0;
+      const end = m[2] ? parseInt(m[2], 10) : size - 1;
+      if (start <= end && end < size) {
+        res.status(206);
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
+        res.setHeader('Content-Length', end - start + 1);
+        const partial = await storageService.getObjectStream(rec.storage_key, { start, end });
+        partial.on('error', () => res.destroy());
+        return partial.pipe(res);
+      }
+    }
+  }
+
+  if (size) res.setHeader('Content-Length', size);
+  const stream = await storageService.getObjectStream(rec.storage_key);
+  stream.on('error', () => res.destroy());
+  return stream.pipe(res);
+});
+
+module.exports = { callReport, callRecording };
