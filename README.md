@@ -140,6 +140,7 @@ Counselors are automatically scoped to only their own leads/calls.
 
 ## Documentation
 
+- [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — full developer guide (architecture, modules, pipeline, conventions, extending)
 - [`docs/DATABASE.md`](docs/DATABASE.md) — schema & ER overview
 - [`docs/API.md`](docs/API.md) — REST endpoint reference
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — VM (PM2) & Docker deployment
